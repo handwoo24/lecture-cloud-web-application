@@ -1,9 +1,15 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { getVersionFn } from '@/server/database'
 
 export const Route = createFileRoute('/')({
   component: App,
+  loader() {
+    return getVersionFn()
+  },
 })
 
 function App() {
-  return <div></div>
+  const version = Route.useLoaderData()
+
+  return <div>Database Version: {version}</div>
 }
