@@ -2,22 +2,19 @@
 # See https://firebase.google.com/docs/app-hosting/configure#cloud-run
 runConfig:
   minInstances: 0
-  # maxInstances: 100
-  # concurrency: 80
-  # cpu: 1
-  # memoryMiB: 512
+  vpcAccess:
+    egress: PRIVATE_RANGES_ONLY # Default value
+    networkInterfaces:
+      # Specify at least one of network and/or subnetwork
+      - network: default
 
 # Environment variables and secrets.
-# env:
-  # Configure environment variables.
-  # See https://firebase.google.com/docs/app-hosting/configure#user-defined-environment
-  # - variable: MESSAGE
-  #   value: Hello world!
-  #   availability:
-  #     - BUILD
-  #     - RUNTIME
-
-  # Grant access to secrets in Cloud Secret Manager.
-  # See https://firebase.google.com/docs/app-hosting/configure#secret-parameters
-  # - variable: MY_SECRET
-  #   secret: mySecretRef
+env:
+  - variable: POSTGRES_HOST
+    secret: postgresHost
+  - variable: POSTGRES_USER
+    secret: postgresUser
+  - variable: POSTGRES_PASSWORD
+    secret: postgresPassword
+  - variable: POSTGRES_DATABASE
+    secret: postgresDatabase
