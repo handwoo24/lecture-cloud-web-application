@@ -173,3 +173,220 @@ my-web-app(기본값, Enter를 입력하시면 됩니다.)
 Github 계정을 연결하고 레포지토리를 선택합니다.
 라이브 브랜치는 조금 전에 push한 live를 선택하고 저장 및 배포를 클릭합니다.
 몇 분 지나면 배포된 앱을 확인하실 수 있습니다.
+
+#### 클라우드 SQL 구성하기
+
+본격적으로 앱을 개발하기 전에, 데이터베이스를 구성해야합니다.
+여기서는 Cloud SQL 서비스를 이용하여 PostgreSQL 데이터베이스를 구성하고 어플리케이션과 연결해봅니다.
+먼저 [GCP Console](https://console.cloud.google.com/)으로 이동합니다.
+Cloud SQL을 검색하고 해당 메뉴로 이동합니다.
+> 인스턴스 만들기 > PostgreSQL 선택
+위 순서대로 조작하여 인스턴스 생성을 시작합니다.
+아래 항목을 참고하여 올바르게 인스턴스를 생성합니다.
+ - Cloud SQL 버전 선택: EnterPrise
+ - 버전 사전 설정: 샌드박스
+ - 인스턴스 정보
+   - 데이터베이스 버전: PostgreSQL 17
+   - 인스턴스 ID: lecture-cloud-web-application-postgres
+   - 비밀번호: 생성을 클릭합니다.(따로 기억해둡니다.)
+ - 리전 및 영역 가용성 선택
+   - 리전: asia-east1
+   - 영역 가용성: 단일 영역
+ - 머신 구성
+   - vCPU 1개, 3.75GB
+ - 저장 용량
+   - 저장용량 자동 증가 사용 설정을 해제합니다.
+ - 연결
+   - 비공개 IP 설정을 추가합니다.
+     - 네트워크는 default를 그대로 유지합니다.
+     - 아래 비공개 서비스 액세스 연결을 사용하도록 안내에 따라 설정합니다.(몇 분 정도 소요됩니다.)
+   - 승인된 네트워크 추가를 클릭하고 **내 IP 사용**을 눌러 추가합니다.
+ - 데이터 보호
+   - 자동 일일 백업 설정을 해제합니다.
+   - point-in-time recovery 사용 설정을 해제합니다.
+   - 인스턴스 삭제 보호의 모든 옵션을 해제합니다.
+
+이제 몇 분 정도 기다리면 인스턴스 구성이 완료됩니다.
+완료되면 연결 탭을 눌러 연결 정보를 확인합니다.
+이 정보를 이용하여 어플리케이션에서 데이터베이스를 사용할 수 있습니다.
+다시 VSCode로 돌아와서 작업합니다.
+아래 라이브러리를 설치합니다.
+
+```bash
+npm install pg
+npm install -D @types/pg
+```
+
+아래와 같이 파일을 생성하고 코드를 작성합니다.
+
+```ts
+// src/database/config.ts
+
+import { createServerOnlyFn } from '@tanstack/react-start'
+import { Pool } from 'pg'
+
+let pool: Pool | null = null
+
+export const getPool = createServerOnlyFn(() => {
+  if (!pool) {
+    return (pool = new Pool({
+      host: process.env.POSTGRES_HOST,
+      user: process.env.POSTGRES_USER,
+      password: process.env.POSTGRES_PASSWORD,
+      database: process.env.POSTGRES_DATABASE,
+      port: 5432,
+    }))
+  }
+
+  return pool
+})
+
+```
+> **process.env.변수이름** 은 코드에 노출되지 않는 런타임 환경변수를 사용하는 방법입니다.
+환경변수를 설정하기 위해서 프로젝트 루트에 .env파일을 생성하고 아래와 같이 작성합니다.
+
+```
+POSTGRES_HOST=${YOUR_HOST} --> 여기서는 공개 IP의 주소를 입력합니다.
+POSTGRES_USER="postgres"
+POSTGRES_PASSWORD=${YOUR_PASSWORD} --> 인스턴스 생성당시 생성된 비밀번호를 입력합니다.
+POSTGRES_DATABASE="postgres" 
+
+```
+
+이제 데이터베이스가 잘 연결되는지 테스트 하기 위한 간단한 쿼리를 작성하고 메인 화면에서 정보를 확인할 수 있도록 구현합니다.
+SQL파일을 작성하고 해당 텍스트를 import 할 수 있도록 vite 설정을 추가합니다.
+```ts
+// vite.env.d.ts
+
+declare module '*.sql?raw' {
+  const content: string
+  export default content
+}
+```
+그리고 Databse 버전을 확인할 수 있는 쿼리를 작성합니다.
+
+```sql
+--> src/database/sql/select_version.sql
+
+SELECT version();
+```
+
+그리고 아래와 같이 database에 접근하는 함수를 생성합니다.
+```ts
+// src/database/version.ts
+
+import { createServerOnlyFn } from '@tanstack/react-start'
+import z from 'zod'
+import { getPool } from './config'
+import sql from './sql/select_version.sql?raw'
+
+export const getVersion = createServerOnlyFn(async () => {
+  try {
+    const pool = getPool()
+    const res = await pool.query(sql)
+    return z.string().parse(res.rows[0].version)
+  } catch (error) {
+    throw new Error('Failed to fetch version from database: ' + error)
+  }
+})
+
+```
+그리고 해당 서버 함수를 실행하기 위한 server-function을 작성합니다.
+
+```ts
+// src/server/database.ts
+
+import { createServerFn } from '@tanstack/react-start'
+import { getVersion } from '@/database/version'
+
+export const getVersionFn = createServerFn({ method: 'GET' }).handler(
+  getVersion,
+)
+```
+> 왜 이러한 과정이 필요한가요?
+
+지금 우리가 사용하고 있는 프레임워크는 Full-stack 프레임워크 입니다.
+이 어플리케이션은 서버와 클라이언트 환경이 구분되어 실행됩니다.
+그러나 서버 코드와 클라이언트 코드는 각기 다른 환경에서 동작하지 않습니다.
+이것을 프레임워크가 구분하여 실행할 수 있도록 추상화되어 있는데,
+그것이 각각 **createServerFn** **createServerOnlyFn**으로 구현되어 있는 것입니다.
+이름에서 알 수 있듯이, **createServerOnlyFn**은 서버 환경에서만 동작하고
+**createServerFn**은 서버 환경에서 동작하는 함수를 네트워크 요청 대신에 함수처럼 사용할 수 있게 해주는 추상화 된 함수 입니다.
+이를 통해 서버와 클라이언트는 함수 호출로 네트워크 요청과 응답을 생략하는 것처럼 동작할 수 있습니다.
+
+
+이제 메인 페이지의 파일을 아래와 같이 수정합니다.
+```ts
+// src/routes/index.ts
+
+import { createFileRoute } from '@tanstack/react-router'
+import { getVersionFn } from '@/server/database'
+
+export const Route = createFileRoute('/')({
+  component: App,
+  loader() {
+    return getVersionFn()
+  },
+})
+
+function App() {
+  const version = Route.useLoaderData()
+
+  return <div>Database Version: {version}</div>
+}
+
+```
+
+그리고 이제 어플리케이션을 실행해보면 데이터베이스의 버전정보가 렌더링 되는 것을 확인할 수 있습니다.
+
+어플리케이션을 실행해서 데이터베이스와 연결되는 것을 확인했지만,
+호스팅 배포 환경에서도 이렇게 데이터베이스가 연결되고 있을까요?
+배포 환경에서도 데이터데이스가 동작하기 위해서는 몇가지 설정이 필요합니다.
+
+apphosting 구성 파일을 아래와 같이 수정합니다.
+```yaml
+# apphosting.yaml
+runConfig:
+  minInstances: 0
+  vpcAccess:
+    egress: PRIVATE_RANGES_ONLY # Default value
+    networkInterfaces:
+      # Specify at least one of network and/or subnetwork
+      - network: default
+```
+그리고 이제 firebase cli를 이용하여 환경 변수들을 보안 비밀로 추가합니다.
+여기서는 GCP의 Secret Manager를 이용하여 민감한 값들을 안전하게 사용할 수 있도록 설정합니다.
+VSCode의 터미널에서 아래 명령어를 하나하나 싫행해 줍니다.
+다른 값들은 .env와 동일하게 작성하면 되지만, POSTGRES_HOST는 비공개 IP주소의 값을 입력해주세요.(Cloud SQL 콘솔에서 확인가능합니다.)
+
+```bash
+firebase apphosting:secrets:set ${변수이름}
+
+
+# ex) firebase apphosting:secrets:set googleClientId
+
+# 이후에는 .env의 값을 붙여넣기를 통해 입력하고 Enter를 누르세요.
+# grant access에 대한 질문에 yes를 입력합니다.
+# apphosting.yaml에 추가할 거냐고 묻는 질문에 올바르게(변수이름을) 입력해 주세요.
+```
+
+올바르게 값들을 입력했다면 apphosting.yaml파일 아래에 다음과 같은 내용이 추가되어 있습니다.
+```yaml
+# apphosting.yaml
+...
+
+env:
+  # Configure environment variables.
+  # See https://firebase.google.com/docs/app-hosting/configure#user-defined-environment
+  - variable: POSTGRES_HOST
+    secret: postgresHost
+  - variable: POSTGRES_USER
+    secret: postgresUser
+  - variable: POSTGRES_PASSWORD
+    secret: postgresPassword
+  - variable: POSTGRES_DATABASE
+    secret: postgresDatabase
+```
+
+이제 변경사항을 커밋하고 live 브랜치에 push 해봅니다.
+새롭게 배포된 어플리케이션을 확인하면 올바르게 데이터베이스 버전을 확인할 수 있습니다.
