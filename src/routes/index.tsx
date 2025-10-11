@@ -11,5 +11,10 @@ export const Route = createFileRoute('/')({
 function App() {
   const version = Route.useLoaderData()
 
-  return <div>Database Version: {version}</div>
+  return (
+    <div>
+      <p>Database Version: {version}</p>
+      <button>구글로 로그인</button>
+    </div>
+  )
 }
