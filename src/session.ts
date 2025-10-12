@@ -16,6 +16,6 @@ export const useAuthSession = createServerOnlyFn(() => {
 
   return useSession<Session>({
     password: AUTH_SECRET,
-    maxAge: 60 * 60,
+    maxAge: 60 * 60 * 24 * 7,
   })
 })

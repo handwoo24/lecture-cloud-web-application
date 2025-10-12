@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { getOAuthClient, verifyTokens } from '@/google/auth'
 import { useAuthSession } from '@/session'
+import { createUserByGoogle, getUserByGoogle } from '@/database/user'
 
 export const Route = createFileRoute('/api/auth/callback/google')({
   server: {
@@ -27,13 +28,17 @@ export const Route = createFileRoute('/api/auth/callback/google')({
           throw new Response('Invalid ID Token', { status: 400 })
         }
 
+        const user =
+          (await getUserByGoogle(idToken.sub)) ||
+          (await createUserByGoogle(idToken))
+
         const session = await useAuthSession()
 
         // 세션에 인증정보를 저장합니다.
-        session.update({
+        await session.update({
           token: crypto.randomUUID(),
-          expires: new Date().getTime() + 60 * 60 * 1000,
-          uid: idToken.sub,
+          expires: new Date().getTime() + 60 * 60 * 24 * 7 * 1000,
+          uid: user.id,
         })
 
         throw redirect({ to: '/' })
