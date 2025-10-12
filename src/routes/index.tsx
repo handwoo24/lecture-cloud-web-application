@@ -8,7 +8,6 @@ import { getVersion } from '@/database/version'
 const loaderFn = createServerFn({ method: 'GET' }).handler(async () => {
   const version = await getVersion()
   const session = await useAuthSession()
-
   return { version, uid: session.data.uid }
 })
 
