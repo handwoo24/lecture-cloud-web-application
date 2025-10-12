@@ -390,3 +390,419 @@ env:
 
 이제 변경사항을 커밋하고 live 브랜치에 push 해봅니다.
 새롭게 배포된 어플리케이션을 확인하면 올바르게 데이터베이스 버전을 확인할 수 있습니다.
+
+#### 구글 로그인 구현하기
+
+이 단계에서는 구글 로그인 API를 설정하고 실제로 어플리케이션에서 해당 기능을 사용할 수 있도록 구현해 보겠습니다.
+로그인 기능을 구현하기 전에 우리는 두 개의 테이블 스키마를 작성해봅니다.
+여기서는 users와 accounts 테이블에 대한 스키마를 작성해봅니다.
+zod의 인터페이스를 이용해서 작성해보면 아래와 같습니다.
+```ts
+// src/model/user.ts
+
+
+import { z } from 'zod'
+
+export const zodAccountSchema = z.object({
+  id: z.string(),
+  uid: z.string(),
+  provider: z.string().max(255),
+  provider_account_id: z.string().max(255),
+})
+
+export type Account = z.infer<typeof zodAccountSchema>
+
+export const zodUserSchema = z.object({
+  id: z.string(),
+  name: z.string().max(255),
+  email: z.string().max(255),
+  email_verified: z.boolean().nullish(),
+  picture: z.string().nullish(),
+  disabled: z.boolean(),
+})
+
+export type User = z.infer<typeof zodUserSchema>
+
+```
+
+이렇게 정의한 Type에 맞게 테이블 생성 쿼리를 작성해봅니다.
+**Cloud SQL Studio**로 이동해서 사용자 인증을 완료하고 **새 SQL 편집기 탭**을 눌러 편집기로 이동합니다.
+아래와 같이 SQL문을 작성하고 실행합니다.
+
+```sql
+CREATE TABLE IF NOT EXISTS users (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  name TEXT,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  email_verified BOOLEAN DEFAULT FALSE,
+  picture TEXT,
+  disabled BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+CREATE TABLE IF NOT EXISTS accounts (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  uid BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  provider TEXT NOT NULL,
+  provider_account_id TEXT NOT NULL,
+  UNIQUE (provider, provider_account_id)
+  );
+```
+
+그리고 추후 데이터베이스 관리를 위해 저장을 누르고 다음과 같은 이름으로 저장합니다.
+> migration0001-create_users
+
+자 이제 다음 단계로 넘어갑니다.
+GCP Console에서 검색을 이용하여 Google Auth Platform으로 이동합니다.
+사용 설정한 후 다음 항목을 참고하여 시작합니다.
+ - 앱 이름: lecture-cloud-web-application
+ - 사용자 지원 이메일: 본인 구글 게정
+ - 대상: 외부
+ - 연락 이메일: 본인 구글 계정
+ - 동의
+
+이제 OAuth Client를 생성합니다.
+아래 내용을 참고하여 각 항목을 작성해 주세요.
+ - 애플리케이션 유형: 웹 애플리케이션
+ - 이름: Development OAuth Client
+ - 승인된 Javascript 원본: http://localhost:3000
+ - 승인된 리디렉션 URI: http://localhost:3000/api/auth/callback/google
+만들기를 완료하면 팝업으로 나오는 클라이언트 ID를 복사합니다.
+그리고 만들어진 클라이언트를 클릭하면 보안 비밀번호를 복사할 수 있습니다.
+.env 파일을 프로젝트 루트 레벨에 생성하고 각 값을 아래와 같이 붙여 넣습니다.
+
+```
+GOOGLE_CLIENT_ID="${CLIENT_ID}"
+GOOGLE_CLIENT_SECRET="${CLIENT_SECRET}"
+GOOGLE_REDIRECT_URI="${REDIRECT_URI}"
+```
+
+자 이제 다시 VSCode로 돌아와서 메인 화면에 로그인 버튼을 추가해 봅니다.
+```tsx
+// src/routes/index.tsx
+...
+
+
+function App() {
+  const version = Route.useLoaderData()
+
+  return (
+    <div>
+      <p>Database Version: {version}</p>
+      <button>구글로 로그인</button>
+    </div>
+  )
+}
+
+```
+
+그리고 구글에서 제공하는 공식 인증 라이브러리를 설치합니다.
+```bash
+npm install google-auth-library
+```
+
+이제 서버 환경에서 Google OAuth Client를 다루는 함수를 작성합니다.
+아래와 같이 파일을 생성하고 코드를 작성해주세요.
+```ts
+// src/google/auth.ts
+
+import { createServerOnlyFn } from '@tanstack/react-start'
+import { OAuth2Client } from 'google-auth-library'
+
+let oauthClient: OAuth2Client | null = null
+
+export const getOAuthClient = createServerOnlyFn(() => {
+  if (!oauthClient) {
+    return (oauthClient = new OAuth2Client({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      redirectUri: process.env.GOOGLE_REDIRECT_URI,
+    }))
+  }
+
+  return oauthClient
+})
+
+export const generateAuthUrl = createServerOnlyFn((client: OAuth2Client) => {
+  return client.generateAuthUrl({
+    access_type: 'online',
+    scope: [
+      'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email openid',
+    ],
+  })
+})
+```
+
+그리고 이것을 사용하기 위하 server-function을 작성합니다.
+
+```ts
+// src/server/auth.ts
+
+import { createServerFn } from '@tanstack/react-start'
+import { redirect } from '@tanstack/react-router'
+import { generateAuthUrl, getOAuthClient } from '@/google/auth'
+
+export const loginFn = createServerFn({ method: 'GET' }).handler(() => {
+  const oauthClient = getOAuthClient()
+  const href = generateAuthUrl(oauthClient)
+  throw redirect({ href })
+})
+
+```
+
+다시 메인화면으로 돌아와서 버튼을 클릭했을 때의 이벤트 핸들러를 추가해주면 됩니다.
+```tsx
+// src/routes/index.tsx
+
+import { createFileRoute } from '@tanstack/react-router'
+import { useServerFn } from '@tanstack/react-start'
+import { useCallback } from 'react'
+import { getVersionFn } from '@/server/database'
+import { loginFn } from '@/server/auth'
+
+export const Route = createFileRoute('/')({
+  component: App,
+  loader() {
+    return getVersionFn()
+  },
+})
+
+function App() {
+  const version = Route.useLoaderData()
+
+  const login = useServerFn(loginFn)
+
+  const handleClickLogin = useCallback(() => login(), [login])
+
+  return (
+    <div>
+      <p>Database Version: {version}</p>
+      <button onClick={handleClickLogin}>구글로 로그인</button>
+    </div>
+  )
+}
+```
+
+이제 어플리케이션을 실행하고 버튼을 누르면 구글 로그인 화면으로 리다이렉트 되는 것을 확인할 수 있습니다.
+그러나 더 진행하지는 마세요! 아직 완성된 것이 아닙니다.
+로그인을 완료하게되면 Google OAuth Provider는 우리가 로그인 함수를 작성할 때 전달한 redirectUri로 인증 정보를 전달합니다.
+우리는 해당 uri에 맞는 api를 구현하고 거기서 인증정보를 활용하여 유저와 세션정보를 처리해야 합니다.
+아래 경로에 파일을 생성하고 코드를 작성합니다.
+
+```ts
+// src/routes/api/auth/callback.google.ts
+
+import { createFileRoute, redirect } from '@tanstack/react-router'
+import { getOAuthClient, verifyTokens } from '@/google/auth'
+import { useAuthSession } from '@/session'
+
+export const Route = createFileRoute('/api/auth/callback/google')({
+  server: {
+    handlers: {
+      GET: async ({ request }) => {
+        // url searchParam으로 인가 코드가 발급됩니다.
+        const url = new URL(request.url)
+        const code = url.searchParams.get('code')
+
+        if (typeof code !== 'string') {
+          return new Response('Invalid code', { status: 400 })
+        }
+
+        const oauthClient = getOAuthClient()
+
+        // 발급된 인가 코드를 OAuth client를 이용해서 토큰으로 교환합니다.
+        const { tokens } = await oauthClient.getToken(code)
+
+        // 토큰으로부터 인증정보를 취득합니다.
+        const payload = await verifyTokens(oauthClient, tokens)
+
+        const idToken = payload.getPayload()
+        if (!idToken?.sub) {
+          throw new Response('Invalid ID Token', { status: 400 })
+        }
+
+        const session = await useAuthSession()
+
+        // 세션에 인증정보를 저장합니다.
+        session.update({
+          token: crypto.randomUUID(),
+          expires: new Date().getTime() + 60 * 60 * 1000,
+          uid: idToken.sub,
+        })
+
+        throw redirect({ to: '/' })
+      },
+    },
+  },
+})
+
+
+
+// src/google/auth.ts
+import type { Credentials } from 'google-auth-library'
+
+...
+
+export const verifyTokens = (client: OAuth2Client, tokens: Credentials) => {
+  if (!tokens.id_token) {
+    throw new Error('Invalid ID Token')
+  }
+
+  return client.verifyIdToken({
+    idToken: tokens.id_token,
+    audience: process.env.GOOGLE_CLIENT_ID,
+  })
+}
+
+
+// src/session.ts
+
+import { createServerOnlyFn } from '@tanstack/react-start'
+import { useSession } from '@tanstack/react-start/server'
+
+type Session = {
+  token?: string
+  expires?: number
+  uid?: string
+}
+
+export const useAuthSession = createServerOnlyFn(() => {
+  const AUTH_SECRET = process.env.AUTH_SECRET
+
+  // .env 파일을 열고 AUTH_SECRET을 적절히 추가합니다. ex) AUTH_SECRET = doNotShareThisSecret
+  if (typeof AUTH_SECRET !== 'string') {
+    throw new Error('Missing AUTH_SECRET')
+  }
+
+  return useSession<Session>({ password: AUTH_SECRET })
+})
+
+```
+
+이제 다시 구글 로그인을 시도해보면 정상적으로 로그인이 완료되고 다시 메인 페이지로 리다이렉트 되는 것을 확인할 수 있습니다.
+이제 메인 페이지에서 session이 존재할 때, 로그인 버튼 대신에 로그아웃 버튼을 렌더링 하도록 수정합니다.
+
+
+```tsx
+// src/routes/index.tsx
+import { createFileRoute } from '@tanstack/react-router'
+import { createServerFn, useServerFn } from '@tanstack/react-start'
+import { useCallback } from 'react'
+import { loginFn } from '@/server/auth'
+import { useAuthSession } from '@/session'
+import { getVersion } from '@/database/version'
+// getVersionFn은 이제 필요없으므로 제거합니다.
+// src/server/database.ts를 제거합니다.
+
+const loaderFn = createServerFn({ method: 'GET' }).handler(async () => {
+  const version = await getVersion()
+  const session = await useAuthSession()
+
+  return { version, uid: session.data.uid }
+})
+
+export const Route = createFileRoute('/')({
+  component: App,
+  loader() {
+    return loaderFn()
+  },
+})
+
+function App() {
+  const { version, uid } = Route.useLoaderData()
+
+  const login = useServerFn(loginFn)
+
+  const handleClickLogin = useCallback(() => login(), [login])
+
+  return (
+    <div>
+      <p>Database Version: {version}</p>
+      {uid ? (
+        <button>로그아웃</button>
+      ) : (
+        <button onClick={handleClickLogin}>구글로 로그인</button>
+      )}
+    </div>
+  )
+}
+
+```
+
+이제 다시 로그인을 해보면, 로그아웃 버튼이 표시됩니다.
+이어서 로그아웃 버튼이 동작하도록 함수를 구현해봅니다.
+```ts
+// src/server/auth.ts
+
+import { createServerFn } from '@tanstack/react-start'
+import { redirect } from '@tanstack/react-router'
+import { useAuthSession } from './session'
+import { generateAuthUrl, getOAuthClient } from '@/google/auth'
+
+export const loginFn = createServerFn({ method: 'GET' }).handler(() => {
+  const oauthClient = getOAuthClient()
+  const href = generateAuthUrl(oauthClient)
+  throw redirect({ href })
+})
+
+export const logoutFn = createServerFn({ method: 'GET' }).handler(async () => {
+  const session = await useAuthSession()
+  session.clear()
+  // 추후에는 로그인 페이지로 이동시키도록 합니다.
+  throw redirect({ to: '/' })
+})
+
+```
+
+이제 로그아웃 버튼에 대한 이벤트 핸들러를 작성하면 로그아웃 기능이 구현됩니다.
+코드를 아래와 같이 수정하고 어플리케이션을 실행합니다.
+로그인 이후에는 로그아웃 버튼이 렌더링 되고,
+로그아웃 이후에는 다시 로그인 버튼이 렌더링 되는 것을 확인할 수 있습니다.
+
+```tsx
+// src/routes/index.tsx
+
+import { createFileRoute } from '@tanstack/react-router'
+import { createServerFn, useServerFn } from '@tanstack/react-start'
+import { useCallback } from 'react'
+import { loginFn, logoutFn } from '@/server/auth'
+import { useAuthSession } from '@/session'
+import { getVersion } from '@/database/version'
+
+const loaderFn = createServerFn({ method: 'GET' }).handler(async () => {
+  const version = await getVersion()
+  const session = await useAuthSession()
+
+  return { version, uid: session.data.uid }
+})
+
+export const Route = createFileRoute('/')({
+  component: App,
+  loader() {
+    return loaderFn()
+  },
+})
+
+function App() {
+  const { version, uid } = Route.useLoaderData()
+
+  const logout = useServerFn(logoutFn)
+
+  const login = useServerFn(loginFn)
+
+  const handleClickLogin = useCallback(() => login(), [login])
+
+  const handleClickLogout = useCallback(() => logout(), [logout])
+
+  return (
+    <div>
+      <p>Database Version: {version}</p>
+      {uid ? (
+        <button onClick={handleClickLogout}>로그아웃</button>
+      ) : (
+        <button onClick={handleClickLogin}>구글로 로그인</button>
+      )}
+    </div>
+  )
+}
+```
