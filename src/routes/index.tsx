@@ -1,18 +1,26 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useServerFn } from '@tanstack/react-start'
+import { createServerFn, useServerFn } from '@tanstack/react-start'
 import { useCallback } from 'react'
-import { getVersionFn } from '@/server/database'
 import { loginFn } from '@/server/auth'
+import { useAuthSession } from '@/server/session'
+import { getVersion } from '@/database/version'
+
+const loaderFn = createServerFn({ method: 'GET' }).handler(async () => {
+  const version = await getVersion()
+  const session = await useAuthSession()
+
+  return { version, uid: session.data.uid }
+})
 
 export const Route = createFileRoute('/')({
   component: App,
-  async loader() {
-    return getVersionFn()
+  loader() {
+    return loaderFn()
   },
 })
 
 function App() {
-  const version = Route.useLoaderData()
+  const { version, uid } = Route.useLoaderData()
 
   const login = useServerFn(loginFn)
 
@@ -21,7 +29,11 @@ function App() {
   return (
     <div>
       <p>Database Version: {version}</p>
-      <button onClick={handleClickLogin}>구글로 로그인</button>
+      {uid ? (
+        <button>로그아웃</button>
+      ) : (
+        <button onClick={handleClickLogin}>구글로 로그인</button>
+      )}
     </div>
   )
 }
