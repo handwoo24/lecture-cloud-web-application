@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { getOAuthClient, verifyTokens } from '@/google/auth'
-import { useAuthSession } from '@/server/session'
+import { useAuthSession } from '@/session'
 
 export const Route = createFileRoute('/api/auth/callback/google')({
   server: {
