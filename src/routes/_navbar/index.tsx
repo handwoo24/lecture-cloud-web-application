@@ -5,7 +5,7 @@ import { loginFn, logoutFn } from '@/server/auth'
 import { useAuthSession } from '@/session'
 import { getVersion } from '@/database/version'
 
-export const Route = createFileRoute('/')({
+export const Route = createFileRoute('/_navbar/')({
   component: App,
   async loader() {
     const version = await getVersion()
@@ -26,13 +26,13 @@ function App() {
   const handleClickLogout = useCallback(() => logout(), [logout])
 
   return (
-    <div>
+    <main>
       <p>Database Version: {version}</p>
       {uid ? (
         <button onClick={handleClickLogout}>로그아웃</button>
       ) : (
         <button onClick={handleClickLogin}>구글로 로그인</button>
       )}
-    </div>
+    </main>
   )
 }
