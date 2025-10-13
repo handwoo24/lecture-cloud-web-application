@@ -1,42 +1,63 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { createServerFn, useServerFn } from '@tanstack/react-start'
-import { useCallback } from 'react'
-import { loginFn, logoutFn } from '@/server/auth'
-import { useAuthSession } from '@/session'
-import { getVersion } from '@/database/version'
-
-const loaderFn = createServerFn({ method: 'GET' }).handler(async () => {
-  const version = await getVersion()
-  const session = await useAuthSession()
-  return { version, uid: session.data.uid }
-})
+import { Search } from 'lucide-react'
 
 export const Route = createFileRoute('/_navbar/')({
   component: App,
-  loader() {
-    return loaderFn()
-  },
+  loader() {},
 })
 
 function App() {
-  const { version, uid } = Route.useLoaderData()
-
-  const logout = useServerFn(logoutFn)
-
-  const login = useServerFn(loginFn)
-
-  const handleClickLogin = useCallback(() => login(), [login])
-
-  const handleClickLogout = useCallback(() => logout(), [logout])
-
   return (
     <main>
-      <p>Database Version: {version}</p>
-      {uid ? (
-        <button onClick={handleClickLogout}>로그아웃</button>
-      ) : (
-        <button onClick={handleClickLogin}>구글로 로그인</button>
-      )}
+      <div>
+        <label className="input">
+          <input type="search" placeholder="domain name" />
+          <span className="label">
+            <Search />
+          </span>
+        </label>
+        <form className="filter">
+          <input className="btn btn-square" type="reset" value="×" />
+          <input
+            className="btn"
+            type="radio"
+            name="frameworks"
+            aria-label="Svelte"
+          />
+          <input
+            className="btn"
+            type="radio"
+            name="frameworks"
+            aria-label="Vue"
+          />
+          <input
+            className="btn"
+            type="radio"
+            name="frameworks"
+            aria-label="React"
+          />
+        </form>
+      </div>
+      <div className="grid">
+        <div className="card bg-base-100 w-96 shadow-sm">
+          <figure>
+            <img
+              src="https://img.daisyui.com/images/stock/photo-1606107557195-0e29a4b5b4aa.webp"
+              alt="Shoes"
+            />
+          </figure>
+          <div className="card-body">
+            <h2 className="card-title">Card Title</h2>
+            <p>
+              A card component has a figure, a body part, and inside body there
+              are title and actions parts
+            </p>
+            <div className="card-actions justify-end">
+              <button className="btn btn-primary">Buy Now</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
   )
 }
