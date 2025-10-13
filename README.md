@@ -2,6 +2,11 @@
 
 ## 목차
  0. 환경설정
+ 1. 클라우드 호스팅 구성하기
+ 2. 클라우드 SQL 구성하기
+ 3. 구글 로그인 구현하기
+ 4. 데이터베이스 활용하기
+
 
 
 ### [환경설정](https://github.com/handwoo24/lecture-cloud-web-application/tree/step-0)
@@ -28,9 +33,6 @@ OS에 따라 추가적인 조치가 필요할 수 있습니다.
  - 레포지토리(Repository)
  - 브랜치(Branch)
  - 커밋(Commit)
- - 클라우드(Cloud)
- - 구글 클라우드 플랫폼(Google Cloud Platform)
- - 앱 호스팅(App Hosting)
  - React
  - npm(node package manager)
 
@@ -75,7 +77,16 @@ npm run dev
 다른 사람, 네트워크에서 접근하려면 호스팅(Hosting)이라는 과정이 필요합니다.
 
 
-#### [클라우드 호스팅 구성하기](https://github.com/handwoo24/lecture-cloud-web-application/tree/step-1)
+### [클라우드 호스팅 구성하기](https://github.com/handwoo24/lecture-cloud-web-application/tree/step-1)
+
+
+#### 챕터에 등장하는 개념들
+각 개념들에 대해 찾아보거나 Gemini에게 질문하여 먼저 학습하세요.
+해당 내용들에 대해 인지하고 실습을 따라하시면 보다 쉽게 따라하실 수 있습니다.
+ - 클라우드(Cloud)
+ - 구글 클라우드 플랫폼(Google Cloud Platform)
+ - 앱 호스팅(App Hosting)
+
 
 클라우드 호스팅을 구성하기 전에, 이전 단계에서 생성한 프레임워크 프로젝트의 설정을 추가해야합니다.
 [tanstack-start](https://tanstack.com/start/latest/docs/framework/react/hosting) 개발문서를 참고합니다.
@@ -174,7 +185,7 @@ Github 계정을 연결하고 레포지토리를 선택합니다.
 라이브 브랜치는 조금 전에 push한 live를 선택하고 저장 및 배포를 클릭합니다.
 몇 분 지나면 배포된 앱을 확인하실 수 있습니다.
 
-#### 클라우드 SQL 구성하기
+### [클라우드 SQL 구성하기](https://github.com/handwoo24/lecture-cloud-web-application/tree/step-2)
 
 본격적으로 앱을 개발하기 전에, 데이터베이스를 구성해야합니다.
 여기서는 Cloud SQL 서비스를 이용하여 PostgreSQL 데이터베이스를 구성하고 어플리케이션과 연결해봅니다.
@@ -368,7 +379,7 @@ env:
 이제 변경사항을 커밋하고 live 브랜치에 push 해봅니다.
 새롭게 배포된 어플리케이션을 확인하면 올바르게 데이터베이스 버전을 확인할 수 있습니다.
 
-#### 구글 로그인 구현하기
+### [구글 로그인 구현하기](https://github.com/handwoo24/lecture-cloud-web-application/tree/step-3)
 
 이 단계에서는 구글 로그인 API를 설정하고 실제로 어플리케이션에서 해당 기능을 사용할 수 있도록 구현해 보겠습니다.
 로그인 기능을 구현하기 전에 우리는 두 개의 테이블 스키마를 작성해봅니다.
@@ -776,7 +787,7 @@ function App() {
 ```
 
 
-#### 독립적인 유저 인증정보 설계하기
+### [데이터베이스 활용하기](https://github.com/handwoo24/lecture-cloud-web-application/tree/step-4)
 지금까지 구글 로그인을 구현하고 session을 구성하는 것까지 완료했지만,
 아직 할일이 하나 더 남았습니다.
 우리는 구글로 부터 제공받은 인증정보를 바탕으로 우리의 데이터베이스에 사용자의 정보와 계정 정보를 저장하고 관리해야 합니다.
