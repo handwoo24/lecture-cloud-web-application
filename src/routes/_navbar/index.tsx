@@ -9,9 +9,9 @@ export const Route = createFileRoute('/_navbar/')({
 function App() {
   return (
     <main>
-      <div>
-        <label className="input">
-          <input type="search" placeholder="domain name" />
+      <div className="product-control-bar">
+        <label className="input w-full md:max-w-sm">
+          <input type="search" placeholder="상품명으로 검색하세요." />
           <span className="label">
             <Search />
           </span>
@@ -22,24 +22,19 @@ function App() {
             className="btn"
             type="radio"
             name="frameworks"
-            aria-label="Svelte"
+            aria-label="운동화"
           />
           <input
             className="btn"
             type="radio"
             name="frameworks"
-            aria-label="Vue"
-          />
-          <input
-            className="btn"
-            type="radio"
-            name="frameworks"
-            aria-label="React"
+            aria-label="티셔츠"
           />
         </form>
       </div>
+      <div className="divider" />
       <div className="grid">
-        <div className="card bg-base-100 w-96 shadow-sm">
+        <div className="product-card">
           <figure>
             <img
               src="https://img.daisyui.com/images/stock/photo-1606107557195-0e29a4b5b4aa.webp"
@@ -47,13 +42,13 @@ function App() {
             />
           </figure>
           <div className="card-body">
-            <h2 className="card-title">Card Title</h2>
+            <h2 className="card-title">나XX 운동화</h2>
             <p>
-              A card component has a figure, a body part, and inside body there
-              are title and actions parts
+              이번 시즌 최고의 운동화. 편안한 착용감과 세련된 디자인을
+              자랑합니다.
             </p>
-            <div className="card-actions justify-end">
-              <button className="btn btn-primary">Buy Now</button>
+            <div className="card-actions">
+              <button className="btn btn-primary">구매하기</button>
             </div>
           </div>
         </div>
