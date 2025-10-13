@@ -14,3 +14,22 @@ code {
   font-family:
     source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
+
+main {
+  /* 이 어플리케이션에서는 main 컨테이너의 padding을 항상 4로 설정합니다. */
+  @apply p-4 md:p-6 lg:p-8;
+}
+
+@utility product-control-bar {
+  /* 상품 검색 및 필터링 컴포넌트 */
+  @apply flex gap-2 md:flex-row-reverse md:justify-between flex-col;
+}
+
+@utility product-card {
+  /* 상품 카드 컴포넌트 */
+  @apply card bg-base-100 w-full md:w-96 shadow-sm hover:bg-base-content/5 transition-colors cursor-pointer;
+}
+
+.product-card .card-actions {
+  @apply justify-end;
+}
