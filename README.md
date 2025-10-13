@@ -291,41 +291,18 @@ export const getVersion = createServerOnlyFn(async () => {
 })
 
 ```
-그리고 해당 서버 함수를 실행하기 위한 server-function을 작성합니다.
-
-```ts
-// src/server/database.ts
-
-import { createServerFn } from '@tanstack/react-start'
-import { getVersion } from '@/database/version'
-
-export const getVersionFn = createServerFn({ method: 'GET' }).handler(
-  getVersion,
-)
-```
-> 왜 이러한 과정이 필요한가요?
-
-지금 우리가 사용하고 있는 프레임워크는 Full-stack 프레임워크 입니다.
-이 어플리케이션은 서버와 클라이언트 환경이 구분되어 실행됩니다.
-그러나 서버 코드와 클라이언트 코드는 각기 다른 환경에서 동작하지 않습니다.
-이것을 프레임워크가 구분하여 실행할 수 있도록 추상화되어 있는데,
-그것이 각각 **createServerFn** **createServerOnlyFn**으로 구현되어 있는 것입니다.
-이름에서 알 수 있듯이, **createServerOnlyFn**은 서버 환경에서만 동작하고
-**createServerFn**은 서버 환경에서 동작하는 함수를 네트워크 요청 대신에 함수처럼 사용할 수 있게 해주는 추상화 된 함수 입니다.
-이를 통해 서버와 클라이언트는 함수 호출로 네트워크 요청과 응답을 생략하는 것처럼 동작할 수 있습니다.
-
 
 이제 메인 페이지의 파일을 아래와 같이 수정합니다.
 ```ts
 // src/routes/index.ts
 
 import { createFileRoute } from '@tanstack/react-router'
-import { getVersionFn } from '@/server/database'
+import { getVersion } from '@/database/version'
 
 export const Route = createFileRoute('/')({
   component: App,
   loader() {
-    return getVersionFn()
+    return getVersion()
   },
 })
 
@@ -557,13 +534,13 @@ export const loginFn = createServerFn({ method: 'GET' }).handler(() => {
 import { createFileRoute } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useCallback } from 'react'
-import { getVersionFn } from '@/server/database'
+import { getVersion } from '@/database/version'
 import { loginFn } from '@/server/auth'
 
 export const Route = createFileRoute('/')({
   component: App,
   loader() {
-    return getVersionFn()
+    return getVersion()
   },
 })
 
@@ -624,7 +601,7 @@ export const Route = createFileRoute('/api/auth/callback/google')({
         const session = await useAuthSession()
 
         // 세션에 인증정보를 저장합니다.
-        session.update({
+        await session.update({
           token: crypto.randomUUID(),
           expires: new Date().getTime() + 60 * 60 * 1000,
           uid: idToken.sub,
@@ -685,28 +662,22 @@ export const useAuthSession = createServerOnlyFn(() => {
 
 ```tsx
 // src/routes/index.tsx
+
 import { createFileRoute } from '@tanstack/react-router'
 import { createServerFn, useServerFn } from '@tanstack/react-start'
 import { useCallback } from 'react'
 import { loginFn } from '@/server/auth'
 import { useAuthSession } from '@/session'
-import { getVersion } from '@/database/version'
-// getVersionFn은 이제 필요없으므로 제거합니다.
-// src/server/database.ts를 제거합니다.
-
-const loaderFn = createServerFn({ method: 'GET' }).handler(async () => {
-  const version = await getVersion()
-  const session = await useAuthSession()
-
-  return { version, uid: session.data.uid }
-})
 
 export const Route = createFileRoute('/')({
   component: App,
-  loader() {
-    return loaderFn()
+  async loader() {
+    const version = await getVersion()
+    const session = await useAuthSession()
+    return { version, uid: session.data.uid }
   },
 })
+
 
 function App() {
   const { version, uid } = Route.useLoaderData()
@@ -763,23 +734,18 @@ export const logoutFn = createServerFn({ method: 'GET' }).handler(async () => {
 // src/routes/index.tsx
 
 import { createFileRoute } from '@tanstack/react-router'
-import { createServerFn, useServerFn } from '@tanstack/react-start'
+import { useServerFn } from '@tanstack/react-start'
 import { useCallback } from 'react'
 import { loginFn, logoutFn } from '@/server/auth'
 import { useAuthSession } from '@/session'
 import { getVersion } from '@/database/version'
 
-const loaderFn = createServerFn({ method: 'GET' }).handler(async () => {
-  const version = await getVersion()
-  const session = await useAuthSession()
-
-  return { version, uid: session.data.uid }
-})
-
 export const Route = createFileRoute('/')({
   component: App,
-  loader() {
-    return loaderFn()
+  async loader() {
+    const version = await getVersion()
+    const session = await useAuthSession()
+    return { version, uid: session.data.uid }
   },
 })
 
@@ -805,4 +771,163 @@ function App() {
     </div>
   )
 }
+
+
 ```
+
+
+#### 독립적인 유저 인증정보 설계하기
+지금까지 구글 로그인을 구현하고 session을 구성하는 것까지 완료했지만,
+아직 할일이 하나 더 남았습니다.
+우리는 구글로 부터 제공받은 인증정보를 바탕으로 우리의 데이터베이스에 사용자의 정보와 계정 정보를 저장하고 관리해야 합니다.
+callback api의 구현을 아래 알고리즘을 따르도록 수정합니다.
+ - 구글로 부터 받은 인증정보를 바탕으로 account 정보를 조회합니다.
+ - account가 존재하면 해당 정보로 부터 user 정보를 조회합니다.
+ - 존재하지 않으면 user와 account를 생성하고 해당 정보를 반환합니다.
+먼저 account 정보를 조회하는 쿼리문과 함수를 구현합니다.
+
+```sql
+--> src/database/sql/select_user_by_provider.sql
+
+SELECT users.*
+FROM accounts
+INNER JOIN
+    users ON accounts.uid = users.id
+WHERE accounts.provider = $1
+    AND accounts.provider_account_id = $2
+    LIMIT 1;
+```
+
+```ts
+// src/database/user.ts
+
+import { createServerOnlyFn } from '@tanstack/react-start'
+import { getPool } from './config'
+import selectUserQuery from './sql/select_user_by_provider.sql?raw'
+import { zodUserSchema } from '@/model/user'
+
+export const getUserByGoogle = createServerOnlyFn(async (sub: string) => {
+  try {
+    const pool = getPool()
+    const res = await pool.query(selectUserQuery, ['google', sub])
+
+    if (!res.rows.length) {
+      return null
+    }
+
+    return zodUserSchema.parse(res.rows[0])
+  } catch (error) {
+    throw new Error('Failed to get user by Google: ' + error)
+  }
+})
+
+```
+
+이제 **getUserByGoogle** 함수에 google IdToken의 sub 값을 전달하면 유저의 정보 혹은 null이 반환됩니다. 
+이에 따라 해당 정보를 반환할지, 혹은 유저를 생성할지 구현합니다.
+먼저 유저를 생성하는 쿼리문과 함수를 작성합니다.
+
+```sql
+--> src/database/sql/insert_user.sql
+
+WITH new_user AS (
+    INSERT INTO users (name, email, email_verified, picture)
+    VALUES ($1, $2, $3, $4)
+    RETURNING * 
+),
+new_account AS (
+    INSERT INTO accounts (uid, provider, provider_account_id)
+    SELECT id, $5, $6 FROM new_user
+)
+SELECT * FROM new_user;
+
+```
+
+```ts
+// src/database/user.ts
+
+...
+
+import type { TokenPayload } from 'google-auth-library'
+
+...
+
+export const createUserByGoogle = createServerOnlyFn(
+  async (idToken: TokenPayload) => {
+    try {
+      const res = await getPool().query(insertUserQuery, [
+        idToken.name,
+        idToken.email,
+        idToken.email_verified,
+        idToken.picture,
+        'google',
+        idToken.sub,
+      ])
+
+      return zodUserSchema.parse(res.rows[0])
+    } catch (error) {
+      throw new Error('Failed to create user by Google: ' + error)
+    }
+  },
+)
+
+
+```
+
+이제 api의 내용을 수정해서 해당 함수들이 적절히 동작할 수 있도록 수정합니다.
+
+```ts
+// src/routes/api/auth/callback.google.ts
+
+import { createFileRoute, redirect } from '@tanstack/react-router'
+import { getOAuthClient, verifyTokens } from '@/google/auth'
+import { useAuthSession } from '@/session'
+import { createUserByGoogle, getUserByGoogle } from '@/database/user'
+
+export const Route = createFileRoute('/api/auth/callback/google')({
+  server: {
+    handlers: {
+      GET: async ({ request }) => {
+        // url searchParam으로 인가 코드가 발급됩니다.
+        const url = new URL(request.url)
+        const code = url.searchParams.get('code')
+
+        if (typeof code !== 'string') {
+          return new Response('Invalid code', { status: 400 })
+        }
+
+        const oauthClient = getOAuthClient()
+
+        // 발급된 인가 코드를 OAuth client를 이용해서 토큰으로 교환합니다.
+        const { tokens } = await oauthClient.getToken(code)
+
+        // 토큰으로부터 인증정보를 취득합니다.
+        const payload = await verifyTokens(oauthClient, tokens)
+
+        const idToken = payload.getPayload()
+        if (!idToken?.sub) {
+          throw new Response('Invalid ID Token', { status: 400 })
+        }
+
+        const user =
+          (await getUserByGoogle(idToken.sub)) ||
+          (await createUserByGoogle(idToken))
+
+        const session = await useAuthSession()
+
+        // 세션에 인증정보를 저장합니다.
+        await session.update({
+          token: crypto.randomUUID(),
+          expires: new Date().getTime() + 60 * 60 * 24 * 7 * 1000,
+          uid: user.id,
+        })
+
+        throw redirect({ to: '/' })
+      },
+    },
+  },
+})
+
+```
+
+이제 우리의 데이터베이스에는 유저와 계정 정보가 저장되고 이 데이터를 이용하여 session을 구성할 수 있습니다.
