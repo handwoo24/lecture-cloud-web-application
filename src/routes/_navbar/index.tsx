@@ -11,7 +11,7 @@ const loaderFn = createServerFn({ method: 'GET' }).handler(async () => {
   return { version, uid: session.data.uid }
 })
 
-export const Route = createFileRoute('/')({
+export const Route = createFileRoute('/_navbar/')({
   component: App,
   loader() {
     return loaderFn()
@@ -30,13 +30,13 @@ function App() {
   const handleClickLogout = useCallback(() => logout(), [logout])
 
   return (
-    <div>
+    <main>
       <p>Database Version: {version}</p>
       {uid ? (
         <button onClick={handleClickLogout}>로그아웃</button>
       ) : (
         <button onClick={handleClickLogin}>구글로 로그인</button>
       )}
-    </div>
+    </main>
   )
 }
