@@ -1,5 +1,8 @@
 import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 import appCss from '../styles.css?url'
+import type { PropsWithChildren } from 'react'
+import { m } from '@/paraglide/messages'
+import { getLocale } from '@/paraglide/runtime'
 
 export const Route = createRootRoute({
   head: () => ({
@@ -12,7 +15,7 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'TanStack Start Starter',
+        title: m.app_title(),
       },
     ],
     links: [
@@ -26,9 +29,9 @@ export const Route = createRootRoute({
   shellComponent: RootDocument,
 })
 
-function RootDocument({ children }: { children: React.ReactNode }) {
+function RootDocument({ children }: PropsWithChildren) {
   return (
-    <html lang="en">
+    <html lang={getLocale()}>
       <head>
         <HeadContent />
       </head>
