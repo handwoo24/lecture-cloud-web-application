@@ -1,13 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { Search } from 'lucide-react'
 import { z } from 'zod'
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { createServerFn } from '@tanstack/react-start'
 import type { FormEvent } from 'react'
 import type { Product } from '@/model/product'
 import { Category, zodCategorySchema } from '@/model/product'
 import { getProducts } from '@/database/products'
 import { m } from '@/paraglide/messages.js'
+import { getLocale } from '@/paraglide/runtime'
 
 const validateSearch = z.object({
   name: z.string().optional(),
@@ -40,6 +41,14 @@ function App() {
   const navigate = Route.useNavigate()
 
   const { products } = Route.useLoaderData()
+
+  const [numberFormat] = useState(
+    () =>
+      new Intl.NumberFormat(getLocale(), {
+        style: 'currency',
+        currency: 'KRW',
+      }),
+  )
 
   const updateSearchParams = useCallback(
     (searchParams: typeof search) =>
@@ -121,7 +130,9 @@ function App() {
               <h2 className="card-title">{product.name}</h2>
               <p>{product.description}</p>
               <div className="card-actions">
-                <button className="btn btn-primary">{product.price}원</button>
+                <button className="btn btn-primary">
+                  {numberFormat.format(Number(product.price))}
+                </button>
               </div>
             </div>
           </div>
