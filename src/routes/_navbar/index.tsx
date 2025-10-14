@@ -2,23 +2,30 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Search } from 'lucide-react'
 import { z } from 'zod'
 import { useCallback } from 'react'
+import { createServerFn } from '@tanstack/react-start'
 import type { FormEvent } from 'react'
+import { Category, zodCategorySchema } from '@/model/product'
+import { getProducts } from '@/database/products'
 
-enum Category {
-  Shoes = 'shoes',
-  Tshirts = 'tshirts',
-}
+const validateSearch = z.object({
+  name: z.string().optional(),
+  category: zodCategorySchema.optional(),
+})
 
-const zodCategorySchema = z.nativeEnum(Category)
+const loaderFn = createServerFn({ method: 'GET' })
+  .inputValidator(validateSearch)
+  .handler(async (ctx) => {
+    const products = await getProducts(ctx.data)
+    return { products }
+  })
 
 export const Route = createFileRoute('/_navbar/')({
   component: App,
-  loader() {},
-  // URL 쿼리 파라미터를 검증합니다.
-  validateSearch: z.object({
-    name: z.string().optional(),
-    category: zodCategorySchema.optional(),
-  }),
+  loader(ctx) {
+    const search = validateSearch.parse(ctx.location.search)
+    return loaderFn({ ...ctx, data: search })
+  },
+  validateSearch,
 })
 
 const parseFormValue = (form: HTMLFormElement, name: string) => {
@@ -29,6 +36,8 @@ const parseFormValue = (form: HTMLFormElement, name: string) => {
 function App() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
+
+  const { products } = Route.useLoaderData()
 
   const updateSearchParams = useCallback(
     (searchParams: typeof search) =>
@@ -47,6 +56,7 @@ function App() {
 
   const handleSubmitSearch = useCallback(
     (e: FormEvent<HTMLFormElement>) => {
+      e.preventDefault()
       const formValue = parseFormValue(e.currentTarget, 'name')
       const name = z.string().parse(formValue)
       updateSearchParams({ ...search, name: name === '' ? undefined : name })
@@ -100,24 +110,20 @@ function App() {
       </div>
       <div className="divider" />
       <div className="grid">
-        <div className="product-card">
-          <figure>
-            <img
-              src="https://img.daisyui.com/images/stock/photo-1606107557195-0e29a4b5b4aa.webp"
-              alt="Shoes"
-            />
-          </figure>
-          <div className="card-body">
-            <h2 className="card-title">나XX 운동화</h2>
-            <p>
-              이번 시즌 최고의 운동화. 편안한 착용감과 세련된 디자인을
-              자랑합니다.
-            </p>
-            <div className="card-actions">
-              <button className="btn btn-primary">구매하기</button>
+        {products.map((product) => (
+          <div className="product-card" key={product.id}>
+            <figure>
+              <img src={product.picture} alt="Shoes" />
+            </figure>
+            <div className="card-body">
+              <h2 className="card-title">{product.name}</h2>
+              <p>{product.description}</p>
+              <div className="card-actions">
+                <button className="btn btn-primary">{product.price}원</button>
+              </div>
             </div>
           </div>
-        </div>
+        ))}
       </div>
     </main>
   )

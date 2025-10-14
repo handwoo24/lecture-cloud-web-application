@@ -33,3 +33,11 @@ main {
 .product-card .card-actions {
   @apply justify-end;
 }
+
+.product-card > figure > img {
+  @apply object-cover aspect-video;
+}
+
+.grid:has(> .product-card) {
+  @apply grid-cols-[repeat(auto-fit,minmax(192px,1fr))] gap-1;
+}
