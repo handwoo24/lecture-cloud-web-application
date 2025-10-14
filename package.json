@@ -9,7 +9,8 @@
     "test": "vitest run",
     "lint": "eslint",
     "format": "prettier",
-    "check": "prettier --write . && eslint --fix"
+    "check": "prettier --write . && eslint --fix",
+    "machine-translate": "inlang machine translate --project project.inlang"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.0.6",
@@ -28,6 +29,8 @@
     "vite-tsconfig-paths": "^5.1.4"
   },
   "devDependencies": {
+    "@inlang/cli": "^3.0.0",
+    "@inlang/paraglide-js": "^2.4.0",
     "@tanstack/eslint-config": "^0.3.0",
     "@tanstack/nitro-v2-vite-plugin": "^1.132.40",
     "@testing-library/dom": "^10.4.0",
