@@ -6,6 +6,7 @@ import { createServerFn } from '@tanstack/react-start'
 import type { FormEvent } from 'react'
 import { Category, zodCategorySchema } from '@/model/product'
 import { getProducts } from '@/database/products'
+import { m } from '@/paraglide/messages.js'
 
 const validateSearch = z.object({
   name: z.string().optional(),
@@ -70,6 +71,7 @@ function App() {
 
   return (
     <main>
+      <p>{m.example_message({ username: 'john' })}</p>
       <div className="product-control-bar">
         <form className="w-full md:max-w-sm" onSubmit={handleSubmitSearch}>
           <label className="input w-full">
