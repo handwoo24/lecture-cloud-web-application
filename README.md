@@ -6,6 +6,7 @@
  2. 클라우드 SQL 구성하기
  3. 구글 로그인 구현하기
  4. 데이터베이스 활용하기
+ 5. UI 구현하기
 
 
 
@@ -942,3 +943,864 @@ export const Route = createFileRoute('/api/auth/callback/google')({
 ```
 
 이제 우리의 데이터베이스에는 유저와 계정 정보가 저장되고 이 데이터를 이용하여 session을 구성할 수 있습니다.
+
+### [UI 구현하기](https://github.com/handwoo24/lecture-cloud-web-application/tree/step-5)
+
+#### 플러그인 설치
+지금까지 작성된 어플리케이션에 간단한 UI를 추가해봅니다.
+여기서는 pre-designed된 컴포넌트를 활용하기 위해 tailwindcss 플러그인 중의 [daisyui](https://daisyui.com/)를 사용합니다.
+아래 라이브러리를 설치합니다.
+
+```bash
+npm install -D daisyui@latest
+```
+
+설치된 플러그인을 사용하기 위해 글로벌 css 파일을 수정해줍니다.
+
+```css
+/* src/styles.css */
+
+@import 'tailwindcss';
+@plugin "daisyui";
+
+```
+
+#### 레이아웃 구성하기
+이제 어플리케이션 전반에 사용되는 navbar를 작성해봅니다.
+daisyui의 [navbar 예제](https://daisyui.com/components/navbar/)를 하나 복사합니다.
+아래 경로에 파일을 생성하고 다음과 같이 코드를 작성합니다.
+
+```tsx
+// src/components/Navbar.tsx
+
+export const Navbar = () => {
+  return (
+    <div className="navbar bg-base-100 shadow-sm">
+      <div className="flex-1">
+        <a className="btn btn-ghost text-xl">daisyUI</a>
+      </div>
+      <div className="flex-none">
+        <button className="btn btn-square btn-ghost">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            className="inline-block h-5 w-5 stroke-current"
+          >
+            {' '}
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"
+            ></path>{' '}
+          </svg>
+        </button>
+      </div>
+    </div>
+  )
+}
+```
+
+이제 이 Navbar를 렌더링 하기 위해 파일 라우트를 구성해야 합니다.
+지금 만드는 파일은 실제로는 URL주소를 할당하지 않는 레이아웃만을 구성합니다.
+설명하기 전에, 아래 파일을 먼저 작성해주세요.
+
+```tsx
+// src/routes/_navbar.tsx
+
+import { Outlet, createFileRoute } from '@tanstack/react-router'
+import { Navbar } from '@/components/Navbar'
+
+export const Route = createFileRoute('/_navbar')({
+  component: LayoutComponent,
+})
+
+function LayoutComponent() {
+  return (
+    <>
+      <Navbar />
+      <Outlet />
+    </>
+  )
+}
+```
+
+그리고 src/routes/index.tsx 파일의 위치를 아래 경로로 수정해 줍니다.
+> src/routes/_navbar/index.tsx
+_navbar.tsx파일을 작성하고 **Outlet**을 해당 컴포넌트에서 렌더링 하게되면,
+_navbar 폴더 하위로 생성되는 endpoint 페이지들은 **Outlet**의 위치에 렌더링 됩니다.
+여기서는 index.tsx, 메인 페이지가 _navbar에 작성된 레이아웃 아래로 렌더링 되는 것입니다.
+어플리케이션을 실행해 보면 확인하실 수 있습니다.
+이제, 복사했던 daisyui의 예제를 우리 어플리케이션에 맞게 수정합니다.
+
+#### UI 예제 구현하기
+
+이 예제에서는 상품 목록 페이지를 구현해 보겠습니다.
+그리드 형태의 상품 목록이 화면에 표시되도록 하고,
+몇가지 필터와 간단한 검색 구현을 추가합니다.
+일단 복잡한 기능을 구현하기 전에 간단하게 컴포넌트를 배치해 봅니다.
+daisyui의 sample 중에서 [label](https://daisyui.com/components/label/), [card](https://daisyui.com/components/card/), [filter](https://daisyui.com/components/filter/)를 사용하여 해당 화면을 작성합니다.
+아래 코드를 참고해 주세요.
+```tsx
+// src/routes/_navbar/index.tsx
+
+import { createFileRoute } from '@tanstack/react-router'
+import { Search } from 'lucide-react'
+
+export const Route = createFileRoute('/_navbar/')({
+  component: App,
+  loader() {},
+})
+
+function App() {
+  return (
+    <main>
+      <div>
+        <label className="input">
+          <input type="search" placeholder="domain name" />
+          <span className="label">
+            <Search />
+          </span>
+        </label>
+        <form className="filter">
+          <input className="btn btn-square" type="reset" value="×" />
+          <input
+            className="btn"
+            type="radio"
+            name="frameworks"
+            aria-label="Svelte"
+          />
+          <input
+            className="btn"
+            type="radio"
+            name="frameworks"
+            aria-label="Vue"
+          />
+          <input
+            className="btn"
+            type="radio"
+            name="frameworks"
+            aria-label="React"
+          />
+        </form>
+      </div>
+      <div className="grid">
+        <div className="card bg-base-100 w-96 shadow-sm">
+          <figure>
+            <img
+              src="https://img.daisyui.com/images/stock/photo-1606107557195-0e29a4b5b4aa.webp"
+              alt="Shoes"
+            />
+          </figure>
+          <div className="card-body">
+            <h2 className="card-title">Card Title</h2>
+            <p>
+              A card component has a figure, a body part, and inside body there
+              are title and actions parts
+            </p>
+            <div className="card-actions justify-end">
+              <button className="btn btn-primary">Buy Now</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  )
+}
+```
+
+싫행시켜보면 각 컴포넌트들이 수직으로 배치된 것을 확인할 수 있습니다.
+이제 이 컴포넌트들을 정리하고 적절한 위치에 배치합니다.
+tailwind css를 이용하여 각 컴포넌트를 스타일링 합니다.
+아래처럼 적당히 배치할 수 있습니다.
+
+```tsx
+// src/routes/_navbar/index.tsx
+
+function App() {
+  return (
+    <main className="p-4">
+      <div className="flex gap-2 md:flex-row-reverse md:justify-between flex-col">
+        <label className="input w-full md:max-w-sm">
+          <input type="search" placeholder="상품명으로 검색하세요." />
+          <span className="label">
+            <Search />
+          </span>
+        </label>
+        <form className="filter">
+          <input className="btn btn-square" type="reset" value="×" />
+          <input
+            className="btn"
+            type="radio"
+            name="frameworks"
+            aria-label="운동화"
+          />
+          <input
+            className="btn"
+            type="radio"
+            name="frameworks"
+            aria-label="티셔츠"
+          />
+        </form>
+      </div>
+      <div className="divider" />
+      <div className="grid">
+        <div className="card bg-base-100 w-96 shadow-sm hover:bg-base-content/5 transition-colors cursor-pointer">
+          <figure>
+            <img
+              src="https://img.daisyui.com/images/stock/photo-1606107557195-0e29a4b5b4aa.webp"
+              alt="Shoes"
+            />
+          </figure>
+          <div className="card-body">
+            <h2 className="card-title">나XX 운동화</h2>
+            <p>
+              이번 시즌 최고의 운동화. 편안한 착용감과 세련된 디자인을
+              자랑합니다.
+            </p>
+            <div className="card-actions justify-end">
+              <button className="btn btn-primary">구매하기</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  )
+}
+...
+
+```
+
+개발자 콘손을 열어서 확인해 보세요.
+device를 모바일 크기에 맞추어도 간단한 반응형 레이아웃이 적용되는 것을 확인할 수 있습니다.
+사실 실무 수준에서는 css를 이렇게 하나하나 입력하지 않고,
+사전에 디자이너와 협업하여 각 요소를 적당한 수준으로 정의하고
+요소의 스타일을 미리 정의하여 사용합니다.
+그 수준은 팀별로 매우 다르기 때문에, 여기서는 업무 방향에 대한 예시만 적용하고 넘어가겠습니다.
+아래 처럼 글로벌 css 파일을 열고 수정합니다.
+
+```css
+/* src/styles.css */
+
+
+...
+
+main {
+  /* 이 어플리케이션에서는 main 컨테이너의 padding을 항상 4로 설정합니다. */
+  @apply p-4 md:p-6 lg:p-8;
+}
+
+@utility product-control-bar {
+  /* 상품 검색 및 필터링 컴포넌트 */
+  @apply flex gap-2 md:flex-row-reverse md:justify-between flex-col;
+}
+
+@utility product-card {
+  /* 상품 카드 컴포넌트 */
+  @apply card bg-base-100 w-full md:w-96 shadow-sm hover:bg-base-content/5 transition-colors cursor-pointer;
+}
+
+.product-card .card-actions {
+  @apply justify-end;
+}
+
+
+```
+
+그리고 정의한 컴포넌트 classname을 적용합니다.
+
+```tsx
+// src/routes/_navbar/index.tsx
+
+
+function App() {
+  return (
+    <main>
+      <div className="product-control-bar">
+        <label className="input w-full md:max-w-sm">
+          <input type="search" placeholder="상품명으로 검색하세요." />
+          <span className="label">
+            <Search />
+          </span>
+        </label>
+        <form className="filter">
+          <input className="btn btn-square" type="reset" value="×" />
+          <input
+            className="btn"
+            type="radio"
+            name="category"
+            aria-label="운동화"
+          />
+          <input
+            className="btn"
+            type="radio"
+            name="category"
+            aria-label="티셔츠"
+          />
+        </form>
+      </div>
+      <div className="divider" />
+      <div className="grid">
+        <div className="product-card">
+          <figure>
+            <img
+              src="https://img.daisyui.com/images/stock/photo-1606107557195-0e29a4b5b4aa.webp"
+              alt="Shoes"
+            />
+          </figure>
+          <div className="card-body">
+            <h2 className="card-title">나XX 운동화</h2>
+            <p>
+              이번 시즌 최고의 운동화. 편안한 착용감과 세련된 디자인을
+              자랑합니다.
+            </p>
+            <div className="card-actions">
+              <button className="btn btn-primary">구매하기</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  )
+}
+
+```
+
+아직 별다른 동작은 하지 못하지만, 간단한 UI를 배치해 보았습니다.
+검색과 필터의 동작은 아주 간단하니 조금만 구현해봅니다.
+
+...
+
+#### UI 기능 구현하기
+
+조금 전에 구현한 UI에 적용될 기능들을 정리해 봅니다.
+ - 상품명을 검색하면 URL 파라미터로 조건을 전달하는 제출 기능
+ - 필터를 클릭하면 URL 파라미터로 조건을 전달하는 제출 기능
+ - 조건에 따라 상품을 조회하고 화면에 그리는 기능(데이터베이스)
+ - 상품을 누르면 결제 팝업을 여는 기능(결제 API 연동)
+이 중 간단한 2개의 기능만 먼저 구현해 봅니다.
+
+아래처럼 코드를 수정해주세요.
+```tsx
+// src/routes/_navbar/index.tsx
+
+import { createFileRoute } from '@tanstack/react-router'
+import { Search } from 'lucide-react'
+import { z } from 'zod'
+import type { FormEvent } from 'react'
+
+enum ZodCategory {
+  Shoes = 'shoes',
+  Tshirts = 'tshirts',
+}
+
+const zodCategorySchema = z.nativeEnum(ZodCategory)
+
+export const Route = createFileRoute('/_navbar/')({
+  component: App,
+  loader() {},
+  // URL 쿼리 파라미터를 검증합니다.
+  validateSearch: z.object({
+    name: z.string().optional(),
+    category: zodCategorySchema.optional(),
+  }),
+})
+
+function App() {
+  const { name, category } = Route.useSearch()
+  const navigate = Route.useNavigate()
+
+  const handleSubmitFilter = (e: FormEvent<HTMLFormElement>) => {
+    // form의 값 변경을 감지하여 url 쿼리 파라미터를 변경합니다.
+    const formData = new FormData(e.currentTarget)
+    const value = zodCategorySchema.parse(formData.get('category'))
+    navigate({ to: '/', search: { category: value, name } })
+  }
+
+  const handleSubmitSearch = (e: FormEvent<HTMLFormElement>) => {
+    // form의 기본 제출을 막습니다.
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+    const value = z.string().parse(formData.get('name'))
+    navigate({
+      to: '/',
+      search: { category, name: value === '' ? undefined : value },
+    })
+  }
+
+  const handleResetFilter = () => {
+    navigate({ to: '/', search: { category: undefined, name } })
+  }
+
+  return (
+    <main>
+      <div className="product-control-bar">
+        <form className="w-full md:max-w-sm" onSubmit={handleSubmitSearch}>
+          <label className="input w-full">
+            <input
+              name="name"
+              type="search"
+              defaultValue={name}
+              placeholder="상품명으로 검색하세요."
+            />
+            <span className="label">
+              <Search />
+            </span>
+          </label>
+        </form>
+        <form
+          className="filter"
+          onChange={handleSubmitFilter}
+          onReset={handleResetFilter}
+        >
+          <input className="btn btn-square" type="reset" value="×" />
+          <input
+            className="btn"
+            type="radio"
+            name="category"
+            value="shoes"
+            defaultChecked={search.category === Category.Shoes}
+            aria-label="신발"
+          />
+          <input
+            className="btn"
+            type="radio"
+            name="category"
+            value="tshirts"
+            defaultChecked={search.category === Category.Tshirts}
+            aria-label="티셔츠"
+          />
+        </form>
+      </div>
+      <div className="divider" />
+      <div className="grid">
+        <div className="product-card">
+          <figure>
+            <img
+              src="https://img.daisyui.com/images/stock/photo-1606107557195-0e29a4b5b4aa.webp"
+              alt="Shoes"
+            />
+          </figure>
+          <div className="card-body">
+            <h2 className="card-title">나XX 운동화</h2>
+            <p>
+              이번 시즌 최고의 운동화. 편안한 착용감과 세련된 디자인을
+              자랑합니다.
+            </p>
+            <div className="card-actions">
+              <button className="btn btn-primary">구매하기</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  )
+}
+
+```
+
+이렇게 form을 이용하여 이벤트 핸들러를 정의함으로써,
+필터와 검색기능을 활용할 수 있게 각 값을 URL 쿼리 파라미터로 전달할 수 있습니다.
+다음 작업을 진행하기 전에, 이번에 정의한 3개의 이벤트 핸들러를 조금 수정하겠습니다.
+아래와 같이 코드 리팩토링을 진행합니다.
+
+```tsx
+// src/routes/_navbar/index.tsx
+
+
+const parseFormValue = (form: HTMLFormElement, name: string) => {
+  const formData = new FormData(form)
+  return formData.get(name)
+}
+
+function App() {
+  const search = Route.useSearch()
+  const navigate = Route.useNavigate()
+
+  const updateSearchParams = useCallback(
+    (searchParams: typeof search) =>
+      navigate({ to: '/', search: searchParams }),
+    [navigate],
+  )
+
+  const handleSubmitFilter = useCallback(
+    (e: FormEvent<HTMLFormElement>) => {
+      const formValue = parseFormValue(e.currentTarget, 'category')
+      const category = zodCategorySchema.parse(formValue)
+      updateSearchParams({ ...search, category })
+    },
+    [navigate, search],
+  )
+
+  const handleSubmitSearch = useCallback(
+    (e: FormEvent<HTMLFormElement>) => {
+      const formValue = parseFormValue(e.currentTarget, 'name')
+      const name = z.string().parse(formValue)
+      updateSearchParams({ ...search, name: name === '' ? undefined : name })
+    },
+    [navigate, search],
+  )
+
+  const handleResetFilter = useCallback(() => {
+    updateSearchParams({ ...search, category: undefined })
+  }, [navigate, search])
+
+  ...
+}
+```
+
+이렇게 각 이벤트 핸들러의 내부 구현을 추상화함으로써 중복된 코드를 두개의 함수로 나누어 구현했습니다.
+각 이벤트 핸들러의 동작을 보다 직관적으로 표현하려고 시도한 의도입니다.
+리팩토링에 정답은 없습니다.
+실무에서는 팀원들 간의 논의(코드리뷰)를 통하여 개선방향을 정하고 그에 맞게 작성하려고 노력하는 태도가 중요합니다.
+
+어플리케이션을 실행하고 필터와 검색의 동작을 테스트합니다.
+올바르게 동작하고 URL 쿼리 파라미터도 업데이트 되는 것을 확인하실 수 있습니다.
+왜 필터나 검색같은 조건 값을 URL 쿼리 파라미터로 전달하려고 할까요?
+아직 상품에 대한 테이블을 생성하지 않았지만,
+우리는 이제 상품에 대한 테이블을 만들고 샘플로 몇가지 상품을 만들어 볼 예정입니다.
+이 상품 목록 페이지가 렌더링 되기 전에, 서버는 URL 파라미터로 전달된 조건 값을 확인하고 SQL 쿼리에 해당 값을 전달하여 클라이언트에 필터링된 데이터들을 전달하게 됩니다.
+이러한 과정을 수행하기 위해 클라이언트의 동작이 서버도 알 수 있는 URL 쿼리 파라미터로 전달되는 것입니다.
+
+#### 상품 테이블 추가하기
+
+이번에는 SQL 데이터베이스에 새로운 테이블 스키마를 생성하고 몇가지 데이터를 추가해 봅니다.
+먼저 스키마를 설계해 봅니다.
+간단하게 zod로 작성해보면 아래와 같습니다.
+```ts
+// src/model/product.ts
+
+import { z } from 'zod'
+
+export enum Category {
+  Shoes = 'shoes',
+  Tshirts = 'tshirts',
+}
+
+export const zodCategorySchema = z.nativeEnum(Category)
+
+export const zodProductSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  category: zodCategorySchema,
+  price: z.number(),
+  picture: z.string().url(),
+  stock: z.number(),
+  description: z.string(),
+})
+
+export type Product = z.infer<typeof zodProductSchema>
+
+```
+
+이제 이 스키마를 바탕으로 테이블을 생성 쿼리를 작성합니다.
+**Cloud SQL Studio**를 열고 아래 쿼리문을 실행합니다.
+
+```sql
+
+-- Step 1: Create a custom ENUM type for product categories if it doesn't already exist.
+-- ENUM 타입을 사용하면 'shoes' 또는 'tshirts' 외의 다른 값이 들어오는 것을 데이터베이스 수준에서 막을 수 있습니다.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'product_category') THEN
+        CREATE TYPE product_category AS ENUM ('shoes', 'tshirts');
+    END IF;
+END$$;
+
+-- Step 2: Create the products table if it doesn't already exist.
+CREATE TABLE IF NOT EXISTS products (
+  -- id: BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY로 수정
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  
+  -- name: z.string() -> TEXT, not nullable
+  name TEXT NOT NULL,
+  
+  -- category: zodCategorySchema -> product_category ENUM, not nullable
+  category product_category NOT NULL,
+  
+  -- price: z.number() -> NUMERIC for precision, not nullable, must be non-negative
+  price NUMERIC(10, 2) NOT NULL CHECK (price >= 0),
+  
+  -- picture: z.string().url() -> TEXT, not nullable
+  picture TEXT NOT NULL,
+  
+  -- stock: z.number() -> INTEGER, not nullable, defaults to 0, must be non-negative
+  stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
+  
+  -- description: z.string() -> TEXT, can be nullable
+  description TEXT,
+
+  -- Best practice: add a timestamp for when the record was created
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+추후 마이그레이션에 사용할 수 있으니, **migration0002-create_products** 라는 이름으로 쿼리문을 저장합니다.
+이제 예시 데이터를 생성해보겠습니다.
+새 쿼리를 열고 아래 SQL문을 실행합니다.
+
+```sql
+
+-- 이 스크립트는 'products' 테이블에 샘플 데이터를 추가합니다.
+--
+-- 주의: 이 스크립트는 실행 시 'products' 테이블의 모든 기존 데이터를 삭제합니다.
+-- 개발 및 테스트 환경에서만 사용하는 것을 권장합니다.
+
+-- 기존 데이터를 모두 삭제하여 깨끗한 상태에서 시작합니다.
+-- RESTART IDENTITY 옵션은 자동 증가하는 id 카운터를 1로 초기화합니다.
+TRUNCATE TABLE products RESTART IDENTITY CASCADE;
+
+-- 샘플 제품 데이터를 삽입합니다.
+INSERT INTO products (name, category, price, picture, stock, description) VALUES
+(
+  'XX 런닝화',
+  'shoes',
+  68000,
+  'https://img.daisyui.com/images/stock/photo-1606107557195-0e29a4b5b4aa.webp',
+  10,
+  '가볍고 편안한 착용감의 런닝화. 다양한 색상과 사이즈로 제공됩니다.'
+),
+(
+  'YY 티셔츠',
+  'tshirts',
+  38000,
+  'https://imgproxy.fourthwall.com/aCf7aQYy2xOgGK0mpblRpHNMruzpqTQcM0E8_G92aEQ/w:720/sm:1/enc/a2eII6EaUM22lElT/co-pyN-4BPzVAVSo/IpsZUju54feSsaeO/u01Yy3krbETm4joT/w0VjChcYKb87fiVp/8pmdoT1MX1rjluOC/przASlorbUyweHTa/YmzNlOQTJ-1OH4NB/A1i5Ke3ZotafJpdb/D4N_dMAbg1ncFCYW/hVoiIH_tntQAtoPR/55uM_hr4eTqEm-fM/d4UI0yQEA90kyD7g/IcS9Gt8gRptSIxmj/JQetld_aCwY',
+  7,
+  '부드러운 면 소재로 제작된 기본 티셔츠. 다양한 색상과 사이즈로 제공됩니다.'
+),
+(
+  'ZZ 티셔츠',
+  'tshirts',
+  59000,
+  'https://imgproxy.fourthwall.com/xohTiCJxyOKvA1xllWiGoHvJxPUf7g1TCZPtD_BbA3w/w:720/sm:1/enc/xe3vmjHVIGPrq5U6/4jZ8s8mnU_ExtmQB/NYJ_dPq_U4d2MDFX/X__whxwsanZEwrZu/FvsVojfSjbZdAS8z/JY22l8NYNu3mgJ9r/YCRqEK9Eius8jULy/LJfjQaSYmnIA9hgL/RYaaow5EW6QuSAhM/0xQlFxihTuJxy7wg/FW2_rl2ztjJGqkzr/fz60FUp69reth5SA/5gEwb-DJ7J2Gl_36/Z7EF7JcpYvp8Q50U/3WC5843hN4k',
+  22,
+  '편안한 핏과 스타일리시한 디자인의 티셔츠. 다양한 색상과 사이즈로 제공됩니다.'
+);
+
+```
+
+해당 쿼리도 **insert_sample_products** 라는 이름으로 저장합니다.
+이제 다시 VSCode로 돌아와서 해당 데이터를 불러올 수 있도록 구현해 봅니다.
+아래처럼 SQL문과 해당 쿼리를 실행하는 함수를 작성합니다.
+
+```sql
+--> src/database/sql/select_products.sql
+
+-- 'products' 테이블에서 카테고리와 이름(선택 사항)으로 제품을 조회합니다.
+-- 파라미터가 제공되지 않은 경우(NULL), 해당 조건은 무시됩니다.
+SELECT
+  *
+FROM
+  products
+WHERE
+  -- 1. 카테고리 필터링: $1 (카테고리)이 NULL이거나, category 값이 $1과 일치하는 경우
+  ($1::text IS NULL OR category = $1::product_category)
+  
+  -- 2. 이름 필터링: $2 (이름)가 NULL이거나, name 값이 $2 패턴을 포함하는 경우 (대소문자 무시)
+  AND ($2::text IS NULL OR name ILIKE '%' || $2 || '%');
+
+
+```
+
+```ts
+// src/database/product.ts
+
+import { createServerOnlyFn } from '@tanstack/react-start'
+import selectProductsQuery from './sql/select_products.sql?raw'
+import { getPool } from './config'
+import type { Product } from '@/model/product'
+import { zodProductSchema } from '@/model/product'
+
+export const getProducts = createServerOnlyFn(
+  async ({ name, category }: Partial<Pick<Product, 'name' | 'category'>>) => {
+    try {
+      const pool = getPool()
+      const res = await pool.query(selectProductsQuery, [name, category])
+      return zodProductSchema.array().parse(res.rows)
+    } catch (error) {
+      throw new Error('Failed to get products: ' + error)
+    }
+  },
+)
+```
+
+그리고 이제 상품 목록 페이지에서 해당 함수를 실행하도록 다음과 같이 수정합니다.
+
+```tsx
+// src/routes/_navbar/index.tsx
+
+import { createFileRoute } from '@tanstack/react-router'
+import { Search } from 'lucide-react'
+import { z } from 'zod'
+import { useCallback } from 'react'
+import { createServerFn } from '@tanstack/react-start'
+import type { FormEvent } from 'react'
+import { Category, zodCategorySchema } from '@/model/product'
+import { getProducts } from '@/database/products'
+
+const validateSearch = z.object({
+  name: z.string().optional(),
+  category: zodCategorySchema.optional(),
+})
+
+const loaderFn = createServerFn({ method: 'GET' })
+  .inputValidator(validateSearch)
+  .handler(async (ctx) => {
+    const products = await getProducts(ctx.data)
+    return { products }
+  })
+
+export const Route = createFileRoute('/_navbar/')({
+  component: App,
+  loader(ctx) {
+    const search = validateSearch.parse(ctx.location.search)
+    return loaderFn({ ...ctx, data: search })
+  },
+  validateSearch,
+})
+
+const parseFormValue = (form: HTMLFormElement, name: string) => {
+  const formData = new FormData(form)
+  return formData.get(name)
+}
+
+function App() {
+  const search = Route.useSearch()
+  const navigate = Route.useNavigate()
+
+  const { products } = Route.useLoaderData()
+
+  ...
+
+}
+```
+
+그리고 실행해보면 에러가 발생하면서 화면이 렌더링 되지 않습니다.
+이유는 **zodProductsSchema**에 price를 number로 정의했는데,
+이 js의 number타입이 psql의 numeric과 일치하지 않기 때문입니다.
+js는 numeric을 string으로 읽습니다.
+따라서 zodSchema에서 price를 z.string으로 수정해줍니다.
+```ts
+// src/model/product.ts
+
+
+import { z } from 'zod'
+
+export enum Category {
+  Shoes = 'shoes',
+  Tshirts = 'tshirts',
+}
+
+export const zodCategorySchema = z.nativeEnum(Category)
+
+export const zodProductSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  category: zodCategorySchema,
+  price: z.string(),
+  picture: z.string().url(),
+  stock: z.number(),
+  description: z.string(),
+})
+
+export type Product = z.infer<typeof zodProductSchema>
+
+```
+
+다시 실행해보면 올바르게 페이지가 렌더링 됩니다.
+이제 이 상품 목록을 그리드에 나오도록 코드를 수정합니다.
+
+```tsx
+// src/routes/_navbar/index.tsx
+
+function App() {
+  
+  ...
+
+  return (
+    <main>
+      
+      ...
+
+      <div className="grid">
+        {products.map((product) => (
+          <div className="product-card" key={product.id}>
+            <figure>
+              <img src={product.picture} alt="Shoes" />
+            </figure>
+            <div className="card-body">
+              <h2 className="card-title">{product.name}</h2>
+              <p>{product.description}</p>
+              <div className="card-actions">
+                <button className="btn btn-primary">구매하기</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </main>
+  )
+}
+
+
+```
+
+그러면 그리드에 수직으로 상품들이 노출되는 것을 확인하실 수 있습니다.
+필터와 검색도 사용해보면 올바르게 동작하고 있습니다.
+이제 표시되지 않는 가격을 추가하고 그리드와 카드 아이템의 스타일을 조금 수정하겠습니다.
+
+```css
+/* src/styles.css */
+
+...
+
+.product-card > figure > img {
+  @apply object-cover aspect-video;
+}
+
+.grid:has(> .product-card) {
+  @apply grid-cols-[repeat(auto-fit,minmax(192px,1fr))] gap-1;
+}
+
+```
+
+```tsx
+// src/routes/_navbar/index.tsx
+
+function App() {
+  
+  ...
+
+  return (
+    <main>
+      
+      ...
+
+      <div className="grid">
+        {products.map((product) => (
+          <div className="product-card" key={product.id}>
+            <figure>
+              <img src={product.picture} alt="Shoes" />
+            </figure>
+            <div className="card-body">
+              <h2 className="card-title">{product.name}</h2>
+              <p>{product.description}</p>
+              <div className="card-actions">
+                <button className="btn btn-primary">{product.price}원</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </main>
+  )
+}
+
+```
+
+여기까지 해서 상품 목록 페이지를 구현해 보았습니다.
+상품클릭시 구매 이벤트를 구현하기 전에, 
+실제로 실무에서 문자열을 화면에 표시하는 방법과 다국어 설정에 관한 부분을 실습해보겠습니다.
+
+### [다국어 설정하기](https://github.com/handwoo24/lecture-cloud-web-application/tree/step-6)
