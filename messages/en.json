@@ -1,4 +1,7 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
-  "example_message": "Hello world {username}"
+  "app_title": "DIY Cloud Web Application",
+  "products_category_shoes": "Shoes",
+  "products_category_tshirts": "T-Shirts",
+  "products_search_placeholder": "Search by product name..."
 }

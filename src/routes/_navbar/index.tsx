@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { useCallback } from 'react'
 import { createServerFn } from '@tanstack/react-start'
 import type { FormEvent } from 'react'
+import type { Product } from '@/model/product'
 import { Category, zodCategorySchema } from '@/model/product'
 import { getProducts } from '@/database/products'
 import { m } from '@/paraglide/messages.js'
@@ -71,7 +72,6 @@ function App() {
 
   return (
     <main>
-      <p>{m.example_message({ username: 'john' })}</p>
       <div className="product-control-bar">
         <form className="w-full md:max-w-sm" onSubmit={handleSubmitSearch}>
           <label className="input w-full">
@@ -79,7 +79,7 @@ function App() {
               name="name"
               type="search"
               defaultValue={search.name}
-              placeholder="상품명으로 검색하세요."
+              placeholder={m.products_search_placeholder()}
             />
             <span className="label">
               <Search />
@@ -98,7 +98,7 @@ function App() {
             name="category"
             value="shoes"
             defaultChecked={search.category === Category.Shoes}
-            aria-label="신발"
+            aria-label={m.products_category_shoes()}
           />
           <input
             className="btn"
@@ -106,13 +106,13 @@ function App() {
             name="category"
             value="tshirts"
             defaultChecked={search.category === Category.Tshirts}
-            aria-label="티셔츠"
+            aria-label={m.products_category_tshirts()}
           />
         </form>
       </div>
       <div className="divider" />
       <div className="grid">
-        {products.map((product) => (
+        {products.map((product: Product) => (
           <div className="product-card" key={product.id}>
             <figure>
               <img src={product.picture} alt="Shoes" />
