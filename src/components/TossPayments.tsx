@@ -37,26 +37,36 @@ export const useWidgets = () => {
 
   return useMemo(() => {
     const renderWidgets = async (options: RenderWidgetsOptions) => {
-      await widgets?.setAmount({
+      if (!widgets) {
+        return false
+      }
+
+      await widgets.setAmount({
         currency: options.currency,
         value: options.value,
       })
 
-      const renderPaymentMethods = await widgets?.renderPaymentMethods({
+      const renderPaymentMethods = await widgets.renderPaymentMethods({
         selector: options.paymentMethodsSelector,
         variantKey: options.paymentMethodsKey || 'DEFAULT',
       })
 
-      const renderAgreement = await widgets?.renderAgreement({
+      const renderAgreement = await widgets.renderAgreement({
         selector: options.agreementSelector,
         variantKey: options.agreementKey || 'AGREEMENT',
       })
 
       await Promise.all([renderPaymentMethods, renderAgreement])
+      return true
     }
+
+    const requestPayment = (
+      ...params: Parameters<TossPaymentsWidgets['requestPayment']>
+    ) => widgets?.requestPayment(...params)
 
     return {
       renderWidgets,
+      requestPayment,
     }
   }, [widgets])
 }
