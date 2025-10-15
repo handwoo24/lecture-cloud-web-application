@@ -53,8 +53,13 @@ export const useWidgets = () => {
       await Promise.all([renderPaymentMethods, renderAgreement])
     }
 
+    const requestPayment = (
+      ...params: Parameters<TossPaymentsWidgets['requestPayment']>
+    ) => widgets?.requestPayment(...params)
+
     return {
       renderWidgets,
+      requestPayment,
     }
   }, [widgets])
 }
