@@ -21,6 +21,7 @@
     "@tanstack/react-router-ssr-query": "^1.131.7",
     "@tanstack/react-start": "^1.132.0",
     "@tanstack/router-plugin": "^1.132.0",
+    "@tosspayments/tosspayments-sdk": "^2.4.0",
     "firebase": "^12.4.0",
     "firebase-admin": "^13.5.0",
     "google-auth-library": "^10.4.0",
