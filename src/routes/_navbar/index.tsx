@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { Search } from 'lucide-react'
 import { z } from 'zod'
 import { useCallback, useState } from 'react'
@@ -122,7 +122,12 @@ function App() {
       <div className="divider" />
       <div className="grid">
         {products.map((product: Product) => (
-          <div className="product-card" key={product.id}>
+          <Link
+            className="product-card"
+            key={product.id}
+            to="/checkout/$productId"
+            params={{ productId: product.id }}
+          >
             <figure>
               <img src={product.picture} alt="Shoes" />
             </figure>
@@ -135,7 +140,7 @@ function App() {
                 </button>
               </div>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </main>
