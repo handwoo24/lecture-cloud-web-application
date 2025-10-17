@@ -2136,3 +2136,377 @@ function App() {
 ```
 
 이렇게 수정하고 실행해보면 원단위로 잘 표현된 것을 확인할 수 있습니다.
+
+### [결제 시스템 구현하기 - 1. 토스페이먼츠 API 사용하기](https://github.com/handwoo24/lecture-cloud-web-application/tree/step-7)
+
+자 이제 그러면 UI의 마지막 기능인 **구매하기** 버튼을 구현하기 위해 결제 시스템을 구현해 봅니다.
+여기서는 일반적인 국내 서비스를 상정하기 위해서 [토스페이먼츠 API](https://developers.tosspayments.com/)를 사용합니다.
+[결제 연동하기](https://docs.tosspayments.com/guides/v2/payment-widget/integration)를 참고하시면서 따라오시면 보다 실제로 개발 문서를 읽고 구현하는 흐름에 대해 이해하실 수 있습니다.
+놀랍게도 토스 페이먼츠에서는 LLM 모델을 이용한 SDK 연동을 지원하지만,
+우리는 보다 상세하게 흐름을 이해하고 사용하기 위해서 직접 구현해봅니다.
+
+```bash
+npm install @tosspayments/tosspayments-sdk --save
+```
+
+#### 결제 컨텍스트 생성하기
+
+개발 가이드를 따라오면 결제위젯 인스턴스를 생성하라고 합니다.
+```ts
+// 토스페이먼츠 개발 가이드 일부
+        const clientKey = "test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm";
+        const tossPayments = TossPayments(clientKey);
+        const customerKey = "JPLwMbBz7UXm89X2KMkWm";
+        const widgets = tossPayments.widgets({
+          customerKey,
+        });
+```
+여기서 우리는 토스페이먼츠 클라이언트 인스턴스를 React의 컨텍스트로 만들어 사용하겠습니다.
+컨텍스트로 사용하려는 이유는 무거운 객체인 토스페이먼츠 클라이언트를 싱글턴으로 호출하고 이를 단방향으로 호출하여 사용할 수 있게 하기 위함입니다.
+아래와 같이 파일을 생성하고 코드를 작성합니다.
+
+```tsx
+// src/components/TossPayments.tsx
+
+import { createContext, useContext, useEffect, useState } from 'react'
+import { loadTossPayments } from '@tosspayments/tosspayments-sdk'
+import type { PropsWithChildren } from 'react'
+import type { TossPaymentsSDK } from '@tosspayments/tosspayments-sdk'
+
+const TossPaymentsContext = createContext<TossPaymentsSDK | null>(null)
+
+export const useTossPayments = useContext(TossPaymentsContext)
+
+export const TossPaymentsProvider = ({ children }: PropsWithChildren) => {
+  const [payments, setPayments] = useState<TossPaymentsSDK | null>(null)
+
+  useEffect(() => {
+    loadTossPayments('test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm').then(setPayments)
+  }, [])
+
+  return <TossPaymentsContext value={payments}>{children}</TossPaymentsContext>
+}
+
+// src/routes/__root.tsx
+
+...
+
+
+function RootDocument({ children }: PropsWithChildren) {
+  return (
+    <html lang={getLocale()}>
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        <TossPaymentsProvider>{children}</TossPaymentsProvider>
+        <Scripts />
+      </body>
+    </html>
+  )
+}
+
+```
+
+이렇게 Context를 만들어서 루트레벨에서 제공하게 되면 하위 컴포넌트에서는 해당 Context의 상태를 공유해 사용하게 됩니다.
+```tsx
+// 사용예시
+
+const ChildComponent = () => {
+  ...
+  
+  const payments = useTossPayments()
+
+  ...
+}
+
+```
+
+이런식으로 사용하는 것이 Context의 일반적인 사용법입니다.
+여기서는 간단하게 구현되어 있지만, React의 단방향 상태흐름을 구현하는데 유용한 Hook입니다.
+
+#### 토스페이먼츠 API 사용하기
+이제 우리가 해야할 일은,
+상품을 클릭하면 결제 페이지로 이동시켜 결제 UI와 이용약관을 렌더링함과 동시에 결제금액을 설정하고,
+결제하기 버튼을 누르면 결제창을 렌더링하는 흐름을 구현합니다.
+
+다음 경로에 파일을 추가하여 결제 페이지를 생성합니다.
+```tsx
+// src/routes/_navbar/checkout.$productId.tsx
+
+import { createFileRoute } from '@tanstack/react-router'
+
+export const Route = createFileRoute('/checkout/$productId')({
+  component: CheckoutComponent,
+})
+
+function CheckoutComponent() {
+  return <main>checkout</main>
+}
+
+```
+
+그리고 상품목록페이지에서 상품카드를 Link로 만들어 클릭하면 결제페이지로 이동하게 합니다.
+
+```tsx
+
+function App() {
+  ...
+
+  return (
+    <main>
+      <div className="grid">
+        {products.map((product: Product) => (
+          <Link
+            className="product-card"
+            key={product.id}
+            to="/checkout/$productId"
+            params={{ productId: product.id }}
+          >
+            <figure>
+              <img src={product.picture} alt="Shoes" />
+            </figure>
+            <div className="card-body">
+              <h2 className="card-title">{product.name}</h2>
+              <p>{product.description}</p>
+              <div className="card-actions">
+                <button className="btn btn-primary">
+                  {numberFormat.format(Number(product.price))}
+                </button>
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </main>
+  )
+}
+```
+
+이제 복습입니다.
+URL 파라미터로 전달되는 상품 ID를 토대로 상품정보를 불러오는 쿼리문을 작성합니다.
+
+```sql
+--> src/database/sql/select_product.sql
+
+SELECT
+  *
+FROM
+  products
+WHERE
+  id = $1;
+
+```
+
+```ts
+// src/database/products.ts
+
+export const getProduct = createServerOnlyFn(async (id: string) => {
+  try {
+    const pool = getPool()
+    const res = await pool.query(selectProductQuery, [id])
+
+    if (!res.rows.length) return null
+
+    return zodProductSchema.parse(res.rows[0])
+  } catch (error) {
+    throw new Error('Failed to get product: ' + error)
+  }
+})
+
+
+
+// src/routes/_navbar/checkout.$productId.tsx
+
+import { createFileRoute } from '@tanstack/react-router'
+import { createServerFn } from '@tanstack/react-start'
+import { z } from 'zod'
+import { getProduct } from '@/database/products'
+
+const loaderFn = createServerFn({ method: 'GET' })
+  .inputValidator(z.string())
+  .handler(async (ctx) => {
+    const product = await getProduct(ctx.data)
+    if (!product) {
+      throw notFound()
+    }
+    return { product }
+  })
+
+export const Route = createFileRoute('/_navbar/checkout/$productId')({
+  component: CheckoutComponent,
+  loader(ctx) {
+    return loaderFn({ ...ctx, data: ctx.params.productId })
+  },
+})
+
+function CheckoutComponent() {
+  const { product } = Route.useLoaderData()
+  return <main>checkout</main>
+}
+```
+
+이미 한번 해보았던 구현입니다. 무리 없이 따라하실 수 있습니다.
+이렇게 작성하면 해당 페이지에서 상품에 대한 정보를 불러오는 과정까지 잘 마무리 했습니다.
+
+이제 개발 문서를 참고하여 3가지 항목을 렌더링 합니다.
+  - 결제 방법(widgets)
+  - 결제 약관(widgets)
+  - 결제 버튼
+
+```tsx
+// src/routes/_navbar/checkout.$productId.tsx
+
+...
+
+function CheckoutComponent() {
+  const { product } = Route.useLoaderData()
+
+  const payments = useTossPayments()
+
+  const [isRendered, setIsRendered] = useState(false)
+
+  const handleClickCheckout = useCallback(async () => {
+    // TODO: 개발 문서의 내용을 붙여넣은 것입니다. 추후 수정합니다.
+    await payments.widgets?.requestPayment({
+      orderId: 'GPjBuelEm7ZUcrSz7REPr',
+      orderName: '토스 티셔츠 외 2건',
+      successUrl: window.location.origin + '/success.html',
+      failUrl: window.location.origin + '/fail.html',
+      customerEmail: 'customer123@gmail.com',
+      customerName: '김토스',
+      customerMobilePhone: '01012341234',
+    })
+  }, [])
+
+  useEffect(() => {
+    if (product?.price) {
+      payments.widgets
+        ?.setAmount({ currency: 'KRW', value: Number(product.price) })
+        .then(async () => {
+          const renderPayment = await payments.widgets?.renderPaymentMethods({
+            selector: '#payment-method',
+            variantKey: 'DEFAULT',
+          })
+          const renderAgreement = await payments.widgets?.renderAgreement({
+            selector: '#agreement',
+            variantKey: 'AGREEMENT',
+          })
+          await Promise.all([renderPayment, renderAgreement])
+          setIsRendered(true)
+        })
+    }
+  }, [product?.price, payments.widgets])
+
+  return (
+    <main>
+      <div id="payment-method" />
+      <div id="agreement" />
+      {isRendered && (
+        <button
+          className="btn btn-primary btn-block btn-lg"
+          onClick={handleClickCheckout}
+        >
+          {m.checkout()}
+          {/* messages에 추가해줍니다. */}
+        </button>
+      )}
+    </main>
+  )
+}
+
+
+```
+
+토스페이먼츠의 개발 문서의 내용을 참고해 작성하면 이렇게 작성할 수 있습니다.
+여기서 실제로 결제버튼을 눌럿을 때의 이벤트 핸들러는 아직 구현되지 않은 부분이니 유의해 주세요.
+useEffect내부의 widgets을 사용하는 부분이 조금 복잡학고 직관성이 떨어지는 것 같으니 context내부로 코드 리팩토링을 잠깐 시도해 봅니다.
+
+```tsx
+// src/components/TossPayments.tsx
+
+export type RenderWidgetsOptions = {
+  currency: string
+  value: number
+  paymentMethodsSelector: string
+  agreementSelector: string
+  paymentMethodsKey?: string
+  agreementKey?: string
+}
+
+export const useWidgets = () => {
+  const payments = useTossPayments()
+
+  const [widgets, setWidgets] = useState<TossPaymentsWidgets | null>(null)
+
+  useEffect(() => {
+    if (payments) {
+      setWidgets(() => payments.widgets({ customerKey: ANONYMOUS }))
+    }
+  }, [payments])
+
+  return useMemo(() => {
+    const renderWidgets = async (options: RenderWidgetsOptions) => {
+      await widgets?.setAmount({
+        currency: options.currency,
+        value: options.value,
+      })
+
+      const renderPaymentMethods = await widgets?.renderPaymentMethods({
+        selector: options.paymentMethodsSelector,
+        variantKey: options.paymentMethodsKey || 'DEFAULT',
+      })
+
+      const renderAgreement = await widgets?.renderAgreement({
+        selector: options.agreementSelector,
+        variantKey: options.agreementKey || 'AGREEMENT',
+      })
+
+      await Promise.all([renderPaymentMethods, renderAgreement])
+    }
+
+    const requestPayment = (
+      ...params: Parameters<TossPaymentsWidgets['requestPayment']>
+    ) => widgets?.requestPayment(...params)
+
+    return {
+      renderWidgets,
+      requestPayment,
+    }
+  }, [widgets])
+}
+
+...
+
+```
+
+이렇게 context 레벨에서 메서드를 추상화해두면 하위 컴포넌트에서 아래처럼 간결하게 사용할 수 있습니다.
+
+```tsx
+// src/routes/_navbar/checkout.$productId.tsx
+
+function CheckoutComponent() {
+  ...
+
+  const widgets = useWidgets()
+
+  ...
+
+  useEffect(() => {
+    widgets
+      .renderWidgets({
+        currency: 'KRW',
+        value: parseInt(product.price),
+        paymentMethodsSelector: '#payment-method',
+        agreementSelector: '#agreement',
+      })
+      .then(() => setIsRendered(true))
+  }, [product.price, widgets.renderWidgets])
+
+
+  ...
+}
+
+```
+
+이렇게 작성하면 훨씬 간단하게 호출하듯 보이게 할 수 있습니다.
