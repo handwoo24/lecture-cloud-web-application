@@ -3,6 +3,7 @@ import appCss from '../styles.css?url'
 import type { PropsWithChildren } from 'react'
 import { m } from '@/paraglide/messages'
 import { getLocale } from '@/paraglide/runtime'
+import { TossPaymentsProvider } from '@/components/TossPayments'
 
 export const Route = createRootRoute({
   head: () => ({
@@ -36,7 +37,7 @@ function RootDocument({ children }: PropsWithChildren) {
         <HeadContent />
       </head>
       <body>
-        {children}
+        <TossPaymentsProvider>{children}</TossPaymentsProvider>
         <Scripts />
       </body>
     </html>
