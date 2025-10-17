@@ -33,15 +33,15 @@ function CheckoutComponent() {
   const handleClickCheckout = useCallback(async () => {
     // TODO: 개발 문서의 내용을 붙여넣은 것입니다. 추후 수정합니다.
     await widgets.requestPayment({
-      orderId: 'GPjBuelEm7ZUcrSz7REPr',
-      orderName: '토스 티셔츠 외 2건',
-      successUrl: window.location.origin + '/success.html',
+      orderId: crypto.randomUUID(),
+      orderName: product.name,
+      successUrl: window.location.origin + '/api/payments/callback',
       failUrl: window.location.origin + '/fail.html',
       customerEmail: 'customer123@gmail.com',
       customerName: '김토스',
       customerMobilePhone: '01012341234',
     })
-  }, [widgets.requestPayment])
+  }, [widgets.requestPayment, product.name])
 
   useEffect(() => {
     widgets
