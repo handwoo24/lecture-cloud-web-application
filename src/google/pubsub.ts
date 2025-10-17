@@ -19,3 +19,22 @@ export const publishMessage = createServerOnlyFn(
     return messageId
   },
 )
+
+export const setupPubsubEmulator = createServerOnlyFn(
+  async (pushEndpoint: string) => {
+    if (process.env.NODE_ENV !== 'development') {
+      throw new Error('Not allowed in production')
+    }
+    const pubsub = getPubsub()
+    const topic = pubsub.topic('checkout-success')
+    const isExist = await topic.exists()
+    if (!isExist[0]) {
+      await topic.create()
+    }
+    const subscription = topic.subscription('checkout-success-sub')
+    const isExistSub = await subscription.exists()
+    if (!isExistSub[0]) {
+      await subscription.create({ pushConfig: { pushEndpoint } })
+    }
+  },
+)
