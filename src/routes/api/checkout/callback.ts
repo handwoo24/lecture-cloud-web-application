@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 import { publishMessage } from '@/google/pubsub'
 import { zodCheckoutCallbackSchema } from '@/model/checkout'
 
@@ -11,12 +11,12 @@ export const Route = createFileRoute('/api/checkout/callback')({
         const result = zodCheckoutCallbackSchema.safeParse(params)
 
         if (!result.success) {
-          return new Response('Invalid request', { status: 400 })
+          throw redirect({ to: '/checkout/error' })
         }
 
         await publishMessage('checkout-success', JSON.stringify(result.data))
 
-        return new Response('Success', { status: 200 })
+        throw redirect({ to: '/checkout/success' })
       },
     },
   },

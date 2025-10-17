@@ -35,8 +35,8 @@ function CheckoutComponent() {
     await widgets.requestPayment({
       orderId: crypto.randomUUID(),
       orderName: product.name,
-      successUrl: window.location.origin + '/api/payments/callback',
-      failUrl: window.location.origin + '/fail.html',
+      successUrl: window.location.origin + '/api/checkout/callback',
+      failUrl: window.location.origin + '/checkout/error',
       customerEmail: 'customer123@gmail.com',
       customerName: '김토스',
       customerMobilePhone: '01012341234',
