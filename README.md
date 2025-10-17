@@ -2510,3 +2510,226 @@ function CheckoutComponent() {
 ```
 
 이렇게 작성하면 훨씬 간단하게 호출하듯 보이게 할 수 있습니다.
+
+### [결제 시스템 구현하기 - 2. PubSub 사용하기](https://github.com/handwoo24/lecture-cloud-web-application/tree/step-8)
+
+잠시 마지막에 구현했던 결제 요쳥 흐름을 살펴볼까요?
+
+```ts
+    await payments.widgets?.requestPayment({
+      orderId: 'GPjBuelEm7ZUcrSz7REPr',
+      orderName: '토스 티셔츠 외 2건',
+      successUrl: window.location.origin + '/success.html',
+      failUrl: window.location.origin + '/fail.html',
+      customerEmail: 'customer123@gmail.com',
+      customerName: '김토스',
+      customerMobilePhone: '01012341234',
+    })
+```
+
+이 요청 API를 잠시 살펴보면, successUrl과 failUrl 값이 존재합니다.
+이 결제요청 함수가 실행되고 나면,
+토스페이먼츠에서 제공하는 결제 UI에 따라 사용자가 결제를 수행한 이후에,
+그 결과에 따라 각각의 url로 어떤 데이터를 보내게 됩니다.
+여기서 지정하는 url은 우리 어플리케이션에서 해당 결과를 가지고,
+**그 이후의 흐름**을 구현하고 우리 비즈니스 로직에 맞는 어떤 동작을 설계합니다.
+
+그럼 PubSub이라는 것은 무엇이길래, 이 과정에서 사용하게 되는 것일까요?
+결제 흐름 이후에, 성공과 실패 결과에 따라 우리는 사용자에게 피드백을 보내거나,
+데이터베이스에 어떤 데이터를 업데이트 하거나 등
+복잡하거나 어떤 리소스를 소모하는 동작을 수행하게 됩니다.
+그러나 리소스는 무한하지 않고 그 부족에 의해 이 동작이 실패할 수 있습니다.
+어플리케이션에서 오류는 언제든 발생할 수 있지만,
+결제 관련한 오류는 일어나면 치명적이고, 빠르게 복구해야 합니다.
+이러한 필요성에 의해서 이러한 경우에는 특별한 메시징 시스템을 사용하게 되는데,
+그것이 PubSub 입니다.
+
+결제가 성공한 경우에, 우리는 successUrl로 **결제 성공** 이라는 주제(Topic)를 게시(Publish)하는 api url을 전달합니다.
+이 동작은 매우 단순하기 때문에 앞서 언급한 문제가 일어날 가능성을 현저히 줄여줍니다.
+이 주제가 게시되고 나면 구독(Subscribe)하는 시스템들에게 이 메시지가 전달됩니다.
+그러면 각 구독자들이 자신이 맡은 역할을 정상적으로 수행했다고 응답을 보낼 때까지,
+PubSub은 반복적으로 메시지를 보내게됩니다.
+혹여 구독자가 어떤 동작을 실패하더라도 성공할 때까지 반복함으로써 결제를 무사히 완료할 수 있게되는 보완시스템입니다.
+
+#### 주제 게시하기
+자 그러면, 실제로 결제가 성공한 이후에 이 주제를 게시할 수 있도록 구현해보겠습니다.
+먼저 Cloud Console로 진입해서 PubSub 탭을 클릭하고 주제를 생성합니다.
+**주제 만들기**를 클릭하고 다음 과정을 진행합니다.
+ - 주제 ID: checkout-success
+ - 기본 구독 추가를 해제합니다.
+ - Google 관리 암호화 키를 선택하고 완료합니다.
+자, 이제 VSCode로 돌아와서 success api를 생성합니다.
+먼저 아래 라우터를 추가합니다.
+```ts
+// src/routes/api/checkout/callback.ts
+import { createFileRoute } from '@tanstack/react-router'
+import { zodCheckoutCallbackSchema } from '@/model/checkout'
+
+export const Route = createFileRoute('/api/checkout/callback')({
+  server: {
+    handlers: {
+      GET: async ({ request }) => {
+        const url = new URL(request.url)
+        const params = Object.fromEntries(url.searchParams.entries())
+        const result = zodCheckoutCallbackSchema.safeParse(params)
+
+        if (!result.success) {
+          return new Response('Invalid request', { status: 400 })
+        }
+
+        ...
+        // 여기에 이제 Topic Publish를 구현합니다.
+      },
+    },
+  },
+})
+
+// src/model/checkout.ts
+import { z } from 'zod'
+
+export const zodCheckoutCallbackSchema = z.object({
+  paymentType: z.string().min(1, 'paymentType is required'),
+  orderId: z.string().min(1, 'orderId is required'),
+  paymentKey: z.string().min(1, 'paymentKey is required'),
+  amount: z.coerce.number().positive('Amount must be a positive number'),
+})
+
+
+```
+
+이제 PubSub을 호출하고 주제를 게시하기전에, PubSub 라이브러리를 설치합니다.
+```bash
+npm i @google-cloud/pubsub
+```
+
+그리고 아래 파일을 추가합니다.
+```ts
+// src/google/pubsub.ts
+
+import { PubSub } from '@google-cloud/pubsub'
+import { createServerOnlyFn } from '@tanstack/react-start'
+
+let pubsubClient: PubSub | null = null
+
+const getPubsub = createServerOnlyFn(() => {
+  if (!pubsubClient) {
+    return (pubsubClient = new PubSub({ projectId: "my-firebase-#"})) 
+    // 올바른 프로젝트 ID를 입력하세요.
+  }
+  return pubsubClient
+})
+
+export const publishMessage = createServerOnlyFn(
+  async (topic: string, message: string) => {
+    const data = Buffer.from(message)
+    const messageId = await getPubsub().topic(topic).publishMessage({ data })
+    return messageId
+  },
+)
+```
+
+그러면 다시 api 라우터로 돌아가서 작업을 마무리합니다.
+```ts
+// src/routes/api/checkout/callback.ts
+export const Route = createFileRoute('/api/checkout/callback')({
+  server: {
+    handlers: {
+      GET: async ({ request }) => {
+        const url = new URL(request.url)
+        const params = Object.fromEntries(url.searchParams.entries())
+        const result = zodCheckoutCallbackSchema.safeParse(params)
+
+        if (!result.success) {
+          return new Response('Invalid request', { status: 400 })
+        }
+
+        await publishMessage('checkout-success', JSON.stringify(result.data))
+
+        return new Response('Success', { status: 200 })
+      },
+    },
+  },
+})
+
+```
+
+자 이제 결제요청 함수의 파라미터를 지금까지 작업한 값으로 일부 수정합니다.
+```tsx
+
+...
+// src/routes/_navbar/checkout.$productId.tsx
+  const handleClickCheckout = useCallback(async () => {
+    // TODO: 개발 문서의 내용을 붙여넣은 것입니다. 추후 수정합니다.
+    await payments.widgets?.requestPayment({
+      orderId: crypto.randomUUID(),
+      orderName: product.name,
+      successUrl: window.location.origin + '/api/checkout/callback',
+      failUrl: window.location.origin + '/fail.html',
+      customerEmail: 'customer123@gmail.com',
+      customerName: '김토스',
+      customerMobilePhone: '01012341234',
+    })
+  }, [])
+
+...
+
+```
+
+일단은 여기까지만 수정하고 한번 결제를 완료해봅니다.
+어플리케이션을 실행시키기 전에 PubSub 클라이언트를 초기화 할 수 있도록 [gcloud CLI](https://cloud.google.com/sdk/docs/install?hl=ko)를 이용하여 로그인 해줍니다.
+```bash
+gcloud auth application-default login
+# 해당 프로젝트가 있는 계정으로 로그인해줍니다.
+```
+그리고 어플리케이션을 실행시켜 결제를 시도해봅니다.
+자 그러면 성공적으로 결제가 완료되고(실제로 결제가 되지는 않습니다!) 화면에 success라는 글자가 노출됩니다.
+
+이번에는 잠깐 쉬어갈 겸, 결제 성공과 실패에 대한 페이지를 만들어 봅니다.
+이 페이지들은 각각의 케이스에 대해 api에서 redirect 에러를 던지는 것으로 라우터가 이동하게 됩니다.
+
+먼저 아래 두 파일을 만들어 봅니다.
+
+```tsx
+// src/routes/_navbar/checkout/success.tsx
+import { createFileRoute } from '@tanstack/react-router'
+
+export const Route = createFileRoute('/_navbar/checkout/success')({
+  component: RouteComponent,
+})
+
+function RouteComponent() {
+  return <div>Hello "/_navbar/checkout/success"!</div>
+}
+
+// src/routes/_navbar/checkout/error.tsx
+export const Route = createFileRoute('/_navbar/checkout/error')({
+  component: RouteComponent,
+})
+
+function RouteComponent() {
+  return <div>Hello "/_navbar/checkout/error"!</div>
+}
+
+
+```
+그리고 이제 추가된 라우터로 redirect될 수 있도록 callback api를 수정합니다.
+```ts
+// src/routes/api/checkout/callback.ts
+...
+        const url = new URL(request.url)
+        const params = Object.fromEntries(url.searchParams.entries())
+        const result = zodCheckoutCallbackSchema.safeParse(params)
+
+        if (!result.success) {
+          throw redirect({ to: '/checkout/error' })
+        }
+
+        await publishMessage('checkout-success', JSON.stringify(result.data))
+
+        throw redirect({ to: '/checkout/success' })
+...
+```
+
+그리고 다시 결제를 시도해볼까요?
+이제 결제가 완료되고 나면 Hello "/_navbar/checkout/success"! 가 화면에 노출됩니다.
+뒤로가기를 눌러도 api 경로가 나오지 않고 다시 상품 결제 페이지로 돌아가게 됩니다.
