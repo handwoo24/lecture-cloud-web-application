@@ -2733,3 +2733,172 @@ function RouteComponent() {
 그리고 다시 결제를 시도해볼까요?
 이제 결제가 완료되고 나면 Hello "/_navbar/checkout/success"! 가 화면에 노출됩니다.
 뒤로가기를 눌러도 api 경로가 나오지 않고 다시 상품 결제 페이지로 돌아가게 됩니다.
+
+
+#### 주제 구독하기
+이번에는 주제가 게시된 이후에 메시지를 받아 처리하는 push구독을 만들어 봅니다.
+그런데 문제가 하나 있습니다.
+개발 환경의 주소로는 push 구독을 만들 수가 없다는 점입니다.
+그래서 pubsub emulator를 이용하여 가상의 pubsub 호스트를 만들고 이를 이용해 개발을 진행합니다.
+```bash
+# Firebase cli로 emulators를 설치합니다.
+# 제어 방법은 아래 주석을 참고합니다.
+firebase init
+
+# 프로젝트를 선택합니다.
+# Emulators 를 선택하고(Space) 제출(Enter)합니다.
+# pubsub 을 선택하고 제출합니다.
+```
+
+다른 프롬프트를 열고 아래 명령어를 실행하여 에뮬레이터를 실행합니다.
+```bash
+firebase emulators:start --only pubsub
+```
+
+이제 VSCode를 열고, 환경변수와 api 라우터를 추가합니다.
+```
+// .env
+PUBSUB_EMULATOR_HOST="localhost:8085"
+```
+환경변수를 선언하지 않으면 pubsub 클라이언트가 에뮬레이터를 바라보지 않습니다.
+이 경우에는 실제 cloud pubsub에 접근하게 됩니다.
+
+```ts
+// src/routes/api/checkout/stock.tsx
+import { createFileRoute } from '@tanstack/react-router'
+
+export const Route = createFileRoute('/api/checkout/stock')({
+  server: {
+    handlers: {
+      GET: async () => {
+        const message = await request.json()
+        console.log(message)
+        return new Response('success', { status: 200 })
+      },
+    },
+  },
+})
+
+// src/routes/api/pubsub/setup.tsx
+import { createFileRoute } from '@tanstack/react-router'
+import { setupPubsubEmulator } from '@/google/pubsub'
+
+export const Route = createFileRoute('/api/pubsub/setup')({
+  server: {
+    handlers: {
+      GET: async ({ request }) => {
+        const url = new URL(request.url)
+        await setupPubsubEmulator(url.origin + '/api/checkout/success')
+        return new Response('success', { status: 200 })
+      },
+    },
+  },
+})
+
+// src/google/pubsub.ts
+export const setupPubsubEmulator = createServerOnlyFn(
+  async (pushEndpoint: string) => {
+    if (process.env.NODE_ENV !== 'development') {
+      throw new Error('Not allowed in production')
+    }
+    const pubsub = getPubsub()
+    const topic = pubsub.topic('checkout-success')
+    const isExist = await topic.exists()
+    if (!isExist[0]) {
+      await topic.create()
+    }
+    const subscription = topic.subscription('checkout-success-sub')
+    const isExistSub = await subscription.exists()
+    if (!isExistSub[0]) {
+      await subscription.create({ pushConfig: { pushEndpoint } })
+    }
+  },
+)
+
+```
+
+자 이제 어플리케이션을 실행하기 전에, 에뮬레이터와 어플리케이션의 네트워크 호스트를 일치시킵니다.
+여기서는 어플리케이션의 호스트를 localhost 대신에 127.0.0.1로 설정합니다.
+```ts
+// vite.config.ts
+const config = defineConfig({
+  server: {
+    host: '127.0.0.1',
+    port: 3000,
+  },
+  ...
+})
+```
+이제 어플리케이션을 실행합니다.
+다시 상품페이지로 이동해서 결제를 성공적으로 완료하면 서버 터미널에 메시지가 성공적으로 전송되는 것을 확인할 수 있습니다.
+메시지 예시는 아래와 같습니다.
+```js
+{
+  subscription: 'projects/my-firebase/subscriptions/checkout-success-sub',        
+  message: {
+    publishTime: '2025-10-18T12:27:11.979Z',
+    data: 'eyJwYXltZW50VHlwZSI6Ik5PUk1BTCIsIm9yZGVySWQiOiI3OWQ0OGFiMi03ODQzLTRlYzgtOGRhNi1jZjViNjVmM2I1OWYiLCJwYXltZW50S2V5IjoidGdlbl8yMDI1MTAxODIxMjY1MFRqa3M0IiwiYW1vdW50Ijo2ODAwMH0=',
+    publish_time: '2025-10-18T12:27:11.979Z',
+    messageId: '1',
+    attributes: {},
+    message_id: '1'
+  }
+}
+```
+
+이제 이 메시지를 활용하여 데이터베이스를 업데이트 하는 재고 서비스를 만들어 봅니다.
+다시 api 라우터로 돌아가서 아래와 같이 수정합니다.
+```ts
+// src/routes/api/checkout/stock.ts
+export const Route = createFileRoute('/api/checkout/stock')({
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        const result = zodMessageSchema.safeParse(await request.json())
+
+        if (!result.success) {
+          return new Response('Invalid message', { status: 400 })
+        }
+
+        const buffer = Buffer.from(result.data.message.data, 'base64')
+        const jsonString = buffer.toString('utf8')
+        const params = zodSuccessParams.safeParse(JSON.parse(jsonString))
+
+        if (!params.success) {
+          return new Response('Invalid params', { status: 400 })
+        }
+
+        // 여기에 제품 재고를 업데이트 하는 로직을 추가합니다.
+
+        return new Response('success', { status: 200 })
+      },
+    },
+  },
+})
+
+// src/model/payments.ts
+export const zodSuccessParams = z.object({
+  pamentType: z.string(),
+  orderId: z.string(),
+  paymentKey: z.string(),
+  amount: z.coerce.number(),
+})
+
+export type SuccessParams = z.infer<typeof zodSuccessParams>
+
+
+// src/model/pubsub.ts
+export const zodMessageSchema = z.object({
+  message: z.object({ data: z.string() }),
+})
+
+export type Message = z.infer<typeof zodMessageSchema>
+
+```
+그런데 문제가 하나 있습니다.
+이 재고 시스템에서는 응답받은 파라미터에서 내가 어떤 상품의 재고를 업데이트 해야하는지 알 수 없습니다.
+그러면 우리가 어떤 과정을 추가 해야 할까요?
+결제요청을 보내기 전에 주문과 주문품목에 대한 데이터를 만들고 이을 데이터베이스에 저장해야 합니다.
+그리고 이 재고 시스템에서는 주문 ID를 토대로 해당 데이터들을 조회하고 그 품목들에 대한 재고를 업데이트 합니다.
+아직 재고 서비스가 구현되지 않았지만, 
+구독 메시지를 확인하는 것까지는 확인했으니 다음 단계에서 진행합니다.
