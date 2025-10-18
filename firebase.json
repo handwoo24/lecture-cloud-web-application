@@ -9,5 +9,15 @@
       "firebase-debug.*.log",
       "functions"
     ]
+  },
+  "emulators": {
+    "pubsub": {
+      "port": 8085
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4000
+    },
+    "singleProjectMode": true
   }
 }

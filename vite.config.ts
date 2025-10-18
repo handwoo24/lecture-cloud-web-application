@@ -7,6 +7,10 @@ import tailwindcss from '@tailwindcss/vite'
 import { nitroV2Plugin } from '@tanstack/nitro-v2-vite-plugin'
 
 const config = defineConfig({
+  server: {
+    host: '127.0.0.1',
+    port: 3000,
+  },
   plugins: [
     paraglideVitePlugin({
       project: './project.inlang',
@@ -25,9 +29,7 @@ const config = defineConfig({
       ],
     }),
     // this is the plugin that enables path aliases
-    viteTsConfigPaths({
-      projects: ['./tsconfig.json'],
-    }),
+    viteTsConfigPaths({ projects: ['./tsconfig.json'] }),
     tailwindcss(),
     tanstackStart(),
     // firebase-app-hosting을 위한 preset을 설정합니다.
