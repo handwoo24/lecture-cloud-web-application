@@ -3,6 +3,7 @@ import { z } from 'zod'
 export const zodOrderSchema = z.object({
   id: z.string().uuid(),
   ordered_at: z.coerce.date(),
+  confirmed_at: z.coerce.date().nullish(),
   uid: z.string().uuid(),
   confirmed: z.boolean(),
   payment_key: z.string().nullish(),

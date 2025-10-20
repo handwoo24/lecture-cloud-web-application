@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { publishMessage } from '@/google/pubsub'
 import { zodCheckoutCallbackSchema } from '@/model/checkout'
+import { confirmOrder } from '@/database/orders'
 
 export const Route = createFileRoute('/api/checkout/callback')({
   server: {
@@ -14,7 +15,6 @@ export const Route = createFileRoute('/api/checkout/callback')({
           throw redirect({ to: '/checkout/error' })
         }
 
-        // 데이터베이스에서 주문을 '결제됨' 상태로 업데이트 합니다.
         await confirmOrder(
           result.data.orderId,
           result.data.paymentKey,

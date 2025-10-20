@@ -2,6 +2,7 @@ import { createServerOnlyFn } from '@tanstack/react-start'
 import { getPool } from './config'
 import insertOrderQuery from './sql/insert_order.sql?raw'
 import insertOrderItemQuery from './sql/insert_order_item.sql?raw'
+import updateOrderQuery from './sql/update_order.sql?raw'
 import type { Product } from '@/model/product'
 import { zodOrderSchema } from '@/model/order'
 
@@ -38,6 +39,17 @@ export const createOrder = createServerOnlyFn(
       throw new Error('Failed to create order: ' + error)
     } finally {
       client.release()
+    }
+  },
+)
+
+export const confirmOrder = createServerOnlyFn(
+  async (id: string, paymentKey: string, paymentType: string) => {
+    try {
+      const pool = getPool()
+      await pool.query(updateOrderQuery, [id, paymentKey, paymentType])
+    } catch (error) {
+      throw new Error('Failed to confirm order: ' + error)
     }
   },
 )
