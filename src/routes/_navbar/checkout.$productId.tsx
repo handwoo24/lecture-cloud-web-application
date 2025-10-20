@@ -1,15 +1,23 @@
-import { createFileRoute, notFound } from '@tanstack/react-router'
-import { createServerFn } from '@tanstack/react-start'
+import { createFileRoute, notFound, redirect } from '@tanstack/react-router'
+import { createServerFn, useServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { useCallback, useEffect, useState } from 'react'
 import { getProduct } from '@/database/products'
 import { useWidgets } from '@/components/TossPayments'
 import { m } from '@/paraglide/messages'
+import { createOrderFn } from '@/server/orders'
+import { useAuthSession } from '@/session'
 
 const loaderFn = createServerFn({ method: 'GET' })
   .inputValidator(z.string())
   .handler(async (ctx) => {
+    const session = await useAuthSession()
+    if (!session.data.uid) {
+      throw redirect({ to: '/login' })
+    }
+
     const product = await getProduct(ctx.data)
+
     if (!product) {
       throw notFound()
     }
@@ -28,17 +36,29 @@ function CheckoutComponent() {
 
   const widgets = useWidgets()
 
+  const createOrder = useServerFn(createOrderFn)
+
   const [isRendered, setIsRendered] = useState(false)
 
   const handleClickCheckout = useCallback(async () => {
-    // TODO: 개발 문서의 내용을 붙여넣은 것입니다. 추후 수정합니다.
-    await widgets.requestPayment({
-      orderId: 'GPjBuelEm7ZUcrSz7REPr',
-      orderName: '토스 티셔츠 외 2건',
-      successUrl: window.location.origin + '/success.html',
-      failUrl: window.location.origin + '/fail.html',
-    })
-  }, [widgets.requestPayment])
+    try {
+      const order = await createOrder({
+        data: {
+          amount: product.price,
+          items: [{ product, quantity: 1 }],
+        },
+      })
+
+      await widgets.requestPayment({
+        orderId: order.id,
+        orderName: product.name,
+        successUrl: window.location.origin + '/success.html',
+        failUrl: window.location.origin + '/fail.html',
+      })
+    } catch (error) {
+      // 결제 실패 피드백
+    }
+  }, [widgets.requestPayment, product.name, createOrder])
 
   useEffect(() => {
     widgets

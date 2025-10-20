@@ -1,0 +1,43 @@
+import { createServerOnlyFn } from '@tanstack/react-start'
+import { getPool } from './config'
+import insertOrderQuery from './sql/insert_order.sql?raw'
+import insertOrderItemQuery from './sql/insert_order_item.sql?raw'
+import type { Product } from '@/model/product'
+import { zodOrderSchema } from '@/model/order'
+
+export const createOrder = createServerOnlyFn(
+  async (
+    uid: string,
+    amount: string,
+    items: Array<{ quantity: number; product: Product }>,
+  ) => {
+    const client = await getPool().connect()
+    try {
+      await client.query('BEGIN')
+
+      const res = await client.query(insertOrderQuery, [uid, amount])
+
+      const order = zodOrderSchema.parse(res.rows[0])
+
+      const promises = items.map(({ product, quantity }) =>
+        client.query(insertOrderItemQuery, [
+          order.id,
+          product.id,
+          product.price,
+          quantity,
+        ]),
+      )
+
+      await Promise.all(promises)
+
+      await client.query('COMMIT')
+
+      return order
+    } catch (error) {
+      await client.query('ROLLBACK')
+      throw new Error('Failed to create order: ' + error)
+    } finally {
+      client.release()
+    }
+  },
+)
