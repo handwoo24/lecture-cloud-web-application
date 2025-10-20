@@ -1,6 +1,7 @@
 import { createServerOnlyFn } from '@tanstack/react-start'
 import selectProductsQuery from './sql/select_products.sql?raw'
 import selectProductQuery from './sql/select_product.sql?raw'
+import updateProductQuery from './sql/update_product.sql?raw'
 import { getPool } from './config'
 import type { Product } from '@/model/product'
 import { zodProductSchema } from '@/model/product'
@@ -29,3 +30,25 @@ export const getProduct = createServerOnlyFn(async (id: string) => {
     throw new Error('Failed to get product: ' + error)
   }
 })
+
+export const updateProductStocks = createServerOnlyFn(
+  async (products: Array<Pick<Product, 'id' | 'stock'>>) => {
+    const client = await getPool().connect()
+    try {
+      await client.query('BEGIN')
+
+      const promises = products.map(({ id, stock }) => {
+        return client.query(updateProductQuery, [id, stock])
+      })
+
+      await Promise.all(promises)
+
+      await client.query('COMMIT')
+    } catch (error) {
+      await client.query('ROLLBACK')
+      throw new Error('Failed to update product stocks: ' + error)
+    } finally {
+      client.release()
+    }
+  },
+)

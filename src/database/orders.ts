@@ -3,8 +3,9 @@ import { getPool } from './config'
 import insertOrderQuery from './sql/insert_order.sql?raw'
 import insertOrderItemQuery from './sql/insert_order_item.sql?raw'
 import updateOrderQuery from './sql/update_order.sql?raw'
+import selectOrderItemsQuery from './sql/select_order_items.sql?raw'
 import type { Product } from '@/model/product'
-import { zodOrderSchema } from '@/model/order'
+import { zodOrderItemSchema, zodOrderSchema } from '@/model/order'
 
 export const createOrder = createServerOnlyFn(
   async (
@@ -53,3 +54,17 @@ export const confirmOrder = createServerOnlyFn(
     }
   },
 )
+
+export const getOrderItems = createServerOnlyFn(async (id: string) => {
+  try {
+    const pool = getPool()
+    const res = await pool.query(selectOrderItemsQuery, [id])
+    if (!res.rows.length) {
+      throw new Error('No order items found')
+    }
+
+    return zodOrderItemSchema.array().parse(res.rows)
+  } catch (error) {
+    throw new Error('Failed to get order items: ' + error)
+  }
+})

@@ -5,4 +5,4 @@ SET
     payment_type = $3,
     confirmed_at = NOW() 
 WHERE 
-    id = $1
+    id = $1;
