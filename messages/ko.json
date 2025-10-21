@@ -5,5 +5,6 @@
   "products_category_tshirts": "티셔츠",
   "products_search_placeholder": "상품명으로 검색하세요...",
   "login_with_google": "구글로 로그인",
-  "checkout": "결제하기"
+  "checkout": "결제하기",
+  "products_stock": "잔여 수량: {stock}개"
 }

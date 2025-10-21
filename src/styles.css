@@ -31,7 +31,7 @@ main {
 }
 
 .product-card .card-actions {
-  @apply justify-end;
+  @apply justify-between items-center;
 }
 
 .product-card > figure > img {

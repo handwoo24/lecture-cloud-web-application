@@ -135,6 +135,9 @@ function App() {
               <h2 className="card-title">{product.name}</h2>
               <p>{product.description}</p>
               <div className="card-actions">
+                <div className="badge badge-info">
+                  {m.products_stock(product)}
+                </div>
                 <button className="btn btn-primary">
                   {numberFormat.format(Number(product.price))}
                 </button>
