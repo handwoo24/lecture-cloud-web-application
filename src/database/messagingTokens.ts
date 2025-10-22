@@ -1,6 +1,7 @@
 import { createServerOnlyFn } from '@tanstack/react-start'
 import insertMessagingTokenQuery from './sql/insert_messaging_token.sql?raw'
 import selectMessagingTokensQuery from './sql/select_messaging_tokens.sql?raw'
+import selectMessagingTokensByOrderQuery from './sql/select_messaging_tokens_by_order.sql?raw'
 import { getPool } from './config'
 import { zodMessagingTokenSchema } from '@/model/messagingToken'
 
@@ -25,3 +26,16 @@ export const getMessagingTokens = createServerOnlyFn(async (uid: string) => {
     throw new Error('Failed to get messaging token: ' + error)
   }
 })
+
+export const getMessagingTokenByOrder = createServerOnlyFn(
+  async (orderId: string) => {
+    try {
+      const pool = getPool()
+      const res = await pool.query(selectMessagingTokensByOrderQuery, [orderId])
+
+      return zodMessagingTokenSchema.array().parse(res.rows)
+    } catch (error) {
+      throw new Error('Failed to get messaging token by order: ' + error)
+    }
+  },
+)
