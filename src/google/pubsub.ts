@@ -37,5 +37,11 @@ export const setupPubsubEmulator = createServerOnlyFn(
     return { topic, subscription }
   },
 )
+
+export const publishMessage = createServerOnlyFn(
+  async (topic: string, message: string) => {
+    const data = Buffer.from(message)
+    const messageId = await getPubsub().topic(topic).publishMessage({ data })
+    return messageId
   },
 )
