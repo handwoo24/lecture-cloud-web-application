@@ -11,9 +11,9 @@ export const Navbar = () => {
         </Link>
       </div>
       <div className="flex-none">
-        <button className="btn btn-square btn-ghost">
+        <Link className="btn btn-square btn-ghost" to="/settings">
           <User />
-        </button>
+        </Link>
       </div>
     </div>
   )
