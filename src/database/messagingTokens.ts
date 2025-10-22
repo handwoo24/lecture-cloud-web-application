@@ -2,6 +2,7 @@ import { createServerOnlyFn } from '@tanstack/react-start'
 import insertMessagingTokenQuery from './sql/insert_messaging_token.sql?raw'
 import selectMessagingTokensQuery from './sql/select_messaging_tokens.sql?raw'
 import selectMessagingTokensByOrderQuery from './sql/select_messaging_tokens_by_order.sql?raw'
+import deleteMessagingTokenQuery from './sql/delete_messaging_token.sql?raw'
 import { getPool } from './config'
 import { zodMessagingTokenSchema } from '@/model/messagingToken'
 
@@ -36,6 +37,28 @@ export const getMessagingTokenByOrder = createServerOnlyFn(
       return zodMessagingTokenSchema.array().parse(res.rows)
     } catch (error) {
       throw new Error('Failed to get messaging token by order: ' + error)
+    }
+  },
+)
+
+export const deleteMessagingTokens = createServerOnlyFn(
+  async (tokens: Array<string>) => {
+    const client = await getPool().connect()
+    try {
+      await client.query('BEGIN')
+
+      const promises = tokens.map((token) =>
+        client.query(deleteMessagingTokenQuery, [token]),
+      )
+
+      await Promise.all(promises)
+
+      await client.query('COMMIT')
+    } catch (error) {
+      await client.query('ROLLBACK')
+      throw new Error('Failed to delete messaging token: ' + error)
+    } finally {
+      client.release()
     }
   },
 )

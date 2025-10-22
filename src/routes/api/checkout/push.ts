@@ -1,8 +1,16 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { zodSuccessParams } from '@/model/payments'
 import { zodMessageSchema } from '@/model/pubsub'
-import { getMessagingTokenByOrder } from '@/database/messagingTokens'
+import {
+  deleteMessagingTokens,
+  getMessagingTokenByOrder,
+} from '@/database/messagingTokens'
 import { sendMessageForMulticast } from '@/google/firebase-admin'
+
+enum TokenErrorCodes {
+  Invalid = 'messaging/invalid-registration-token',
+  NotRegistered = 'messaging/registration-token-not-registered',
+}
 
 export const Route = createFileRoute('/api/checkout/push')({
   server: {
@@ -27,23 +35,35 @@ export const Route = createFileRoute('/api/checkout/push')({
         )
         const tokens = messagingTokens.map(({ fcm_token }) => fcm_token)
 
-        await new Promise((resolve) => setTimeout(resolve, 5000))
-
-        if (tokens.length) {
-          const result = await sendMessageForMulticast({
-            notification: {
-              title: '결제 완료! 🎉',
-              body: `결제 금액 ${params.data.amount}원이 정상적으로 처리되었습니다.`,
-            },
-            tokens,
-          })
-
-          result.responses.map((res, index) => {
-            if (!res.success) {
-              console.log('Token expired:', tokens[index])
-            }
-          })
+        if (!tokens.length) {
+          return new Response('No tokens', { status: 201 })
         }
+
+        const result = await sendMessageForMulticast({
+          notification: {
+            title: '결제 완료! 🎉',
+            body: `결제 금액 ${params.data.amount}원이 정상적으로 처리되었습니다.`,
+          },
+          tokens,
+        })
+
+        const targets = result.responses.reduce(
+          (acc: Array<string>, cur, idx) => {
+            const code = cur.error?.code
+            if (
+              code !== TokenErrorCodes.Invalid &&
+              code !== TokenErrorCodes.NotRegistered
+            ) {
+              return acc
+            }
+
+            acc.push(tokens[idx])
+            return acc
+          },
+          [],
+        )
+
+        await deleteMessagingTokens(targets)
 
         return new Response('success', { status: 200 })
       },
