@@ -3,5 +3,6 @@
   "app_title": "DIY Cloud Web Application",
   "products_category_shoes": "Shoes",
   "products_category_tshirts": "T-Shirts",
-  "products_search_placeholder": "Search by product name..."
+  "products_search_placeholder": "Search by product name...",
+  "login_with_google": "Login with Google"
 }

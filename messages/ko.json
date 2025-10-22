@@ -3,5 +3,6 @@
   "app_title": "DIY 클라우드 웹 애플리케이션",
   "products_category_shoes": "신발",
   "products_category_tshirts": "티셔츠",
-  "products_search_placeholder": "상품명으로 검색하세요..."
+  "products_search_placeholder": "상품명으로 검색하세요...",
+  "login_with_google": "구글로 로그인"
 }
