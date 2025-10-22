@@ -27,9 +27,17 @@ main {
 
 @utility product-card {
   /* 상품 카드 컴포넌트 */
-  @apply card bg-base-100 w-full md:w-96 shadow-sm hover:bg-base-content/5 transition-colors cursor-pointer;
+  @apply card bg-base-100 w-full shadow-sm hover:bg-base-content/5 transition-colors cursor-pointer;
 }
 
 .product-card .card-actions {
   @apply justify-end;
+}
+
+.product-card > figure > img {
+  @apply object-cover aspect-video;
+}
+
+.grid:has(> .product-card) {
+  @apply grid-cols-[repeat(auto-fit,minmax(192px,384px))] gap-4;
 }
