@@ -52,8 +52,8 @@ function CheckoutComponent() {
       await widgets.requestPayment({
         orderId: order.id,
         orderName: product.name,
-        successUrl: window.location.origin + '/success.html',
-        failUrl: window.location.origin + '/fail.html',
+        successUrl: window.location.origin + '/api/checkout/callback',
+        failUrl: window.location.origin + '/checkout/error',
       })
     } catch (error) {
       // 결제 실패 피드백
