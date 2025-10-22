@@ -27,7 +27,7 @@ main {
 
 @utility product-card {
   /* 상품 카드 컴포넌트 */
-  @apply card bg-base-100 w-full shadow-sm hover:bg-base-content/5 transition-colors cursor-pointer;
+  @apply card bg-base-100 w-full max-w-[576px] shadow-sm hover:bg-base-content/5 transition-colors cursor-pointer;
 }
 
 .product-card .card-actions {
@@ -39,5 +39,22 @@ main {
 }
 
 .grid:has(> .product-card) {
-  @apply grid-cols-[repeat(auto-fit,minmax(192px,384px))] gap-4;
+  @apply grid-cols-[repeat(auto-fit,minmax(192px,1fr))] gap-4;
+}
+
+@utility img-mask {
+  /* 이미지(편집) 마스크 컴포넌트 */
+  @apply absolute inset-0 w-full flex justify-center items-center aspect-video hover:bg-base-100/60 transition-colors cursor-pointer;
+}
+
+label:has(.img-mask) {
+  @apply relative;
+}
+
+.img-mask * {
+  @apply opacity-0 transition-opacity;
+}
+
+.img-mask:hover * {
+  @apply opacity-100;
 }

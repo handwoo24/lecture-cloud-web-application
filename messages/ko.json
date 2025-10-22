@@ -6,5 +6,12 @@
   "products_search_placeholder": "상품명으로 검색하세요...",
   "login_with_google": "구글로 로그인",
   "checkout": "결제하기",
-  "products_stock": "잔여 수량: {stock}개"
+  "products_stock": "잔여 수량: {stock}개",
+  "products_info": "상품 정보",
+  "products_name_label": "상품 명",
+  "products_price_label": "가격",
+  "products_stock_label": "잔여 수량",
+  "products_picture_label": "상품 이미지",
+  "save": "저장",
+  "currency_symbol": "₩"
 }

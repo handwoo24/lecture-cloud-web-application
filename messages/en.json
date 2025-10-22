@@ -6,5 +6,11 @@
   "products_search_placeholder": "Search by product name...",
   "login_with_google": "Login with Google",
   "checkout": "Checkout",
-  "products_stock": "{stock} in stock"
+  "products_stock": "{stock} in stock",
+  "products_name_label": "Name",
+  "products_price_label": "Price",
+  "products_stock_label": "Stock",
+  "products_picture_label": "Picture",
+  "save": "Save",
+  "currency_symbol": "₩"
 }

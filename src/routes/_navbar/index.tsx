@@ -125,7 +125,7 @@ function App() {
           <Link
             className="product-card"
             key={product.id}
-            to="/checkout/$productId"
+            to="/$productId"
             params={{ productId: product.id }}
           >
             <figure>
