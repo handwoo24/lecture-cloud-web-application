@@ -50,7 +50,7 @@ function RouteComponent() {
     validators: {
       onChange: fieldsSchema,
     },
-    onSubmit: console.log,
+    onSubmit: async ({ value }) => {},
   })
 
   const handleSubmit = useCallback(

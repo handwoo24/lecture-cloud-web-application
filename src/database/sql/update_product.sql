@@ -1,7 +1,9 @@
 UPDATE products
 SET
-    stock = stock + $2
+    name = $2,
+    price = $3,
+    stock = $4,
+    picture = $5
 WHERE
     id = $1
-    AND (stock + $2) >= 0
-RETURNING id, stock;
+RETURNING *;

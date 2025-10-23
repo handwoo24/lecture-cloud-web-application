@@ -1,9 +1,12 @@
 import { createServerOnlyFn } from '@tanstack/react-start'
 import selectProductsQuery from './sql/select_products.sql?raw'
 import selectProductQuery from './sql/select_product.sql?raw'
+import updateProductStockQuery from './sql/update_product_stock.sql?raw'
 import updateProductQuery from './sql/update_product.sql?raw'
+import insertStorageItemQuery from './sql/insert_storage_item.sql?raw'
 import { getPool } from './config'
 import type { Product } from '@/model/product'
+import type { StorageItem } from '@/model/storageItem'
 import { zodProductSchema } from '@/model/product'
 
 export const getProducts = createServerOnlyFn(
@@ -38,7 +41,7 @@ export const updateProductStocks = createServerOnlyFn(
       await client.query('BEGIN')
 
       const promises = products.map(({ id, stock }) => {
-        return client.query(updateProductQuery, [id, stock])
+        return client.query(updateProductStockQuery, [id, stock])
       })
 
       await Promise.all(promises)
@@ -47,6 +50,57 @@ export const updateProductStocks = createServerOnlyFn(
     } catch (error) {
       await client.query('ROLLBACK')
       throw new Error('Failed to update product stocks: ' + error)
+    } finally {
+      client.release()
+    }
+  },
+)
+
+export const updateProduct = createServerOnlyFn(
+  async (product: Product, item?: StorageItem) => {
+    const pool = getPool()
+    if (!item) {
+      try {
+        await pool.query(updateProductQuery, [
+          product.id,
+          product.name,
+          product.price,
+          product.stock,
+          product.picture,
+        ])
+      } catch (error) {
+        throw new Error('Failed to update product: ' + error)
+      }
+
+      return
+    }
+
+    const client = await pool.connect()
+
+    try {
+      await client.query('BEGIN')
+
+      await client.query(updateProductQuery, [
+        product.id,
+        product.name,
+        product.price,
+        product.stock,
+        product.picture,
+      ])
+
+      await client.query(insertStorageItemQuery, [
+        item.path,
+        item.download_url,
+        item.uid,
+        item.name,
+        item.type,
+        item.size,
+      ])
+
+      await client.query('COMMIT')
+    } catch (error) {
+      await client.query('ROLLBACK')
+      throw new Error('Failed to update product: ' + error)
     } finally {
       client.release()
     }
