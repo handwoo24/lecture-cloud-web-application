@@ -4,6 +4,7 @@ import selectMessagingTokensQuery from './sql/select_messaging_tokens.sql?raw'
 import selectMessagingTokensByOrderQuery from './sql/select_messaging_tokens_by_order.sql?raw'
 import deleteMessagingTokenQuery from './sql/delete_messaging_token.sql?raw'
 import { getPool } from './config'
+import { withTransaction } from './transaction'
 import { zodMessagingTokenSchema } from '@/model/messagingToken'
 
 export const createMessagingToken = createServerOnlyFn(
@@ -43,22 +44,16 @@ export const getMessagingTokenByOrder = createServerOnlyFn(
 
 export const deleteMessagingTokens = createServerOnlyFn(
   async (tokens: Array<string>) => {
-    const client = await getPool().connect()
     try {
-      await client.query('BEGIN')
+      await withTransaction(getPool(), async (client) => {
+        const promises = tokens.map((token) =>
+          client.query(deleteMessagingTokenQuery, [token]),
+        )
 
-      const promises = tokens.map((token) =>
-        client.query(deleteMessagingTokenQuery, [token]),
-      )
-
-      await Promise.all(promises)
-
-      await client.query('COMMIT')
+        await Promise.all(promises)
+      })
     } catch (error) {
-      await client.query('ROLLBACK')
       throw new Error('Failed to delete messaging token: ' + error)
-    } finally {
-      client.release()
     }
   },
 )

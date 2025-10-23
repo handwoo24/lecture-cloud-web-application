@@ -5,6 +5,7 @@ import updateProductStockQuery from './sql/update_product_stock.sql?raw'
 import updateProductQuery from './sql/update_product.sql?raw'
 import insertStorageItemQuery from './sql/insert_storage_item.sql?raw'
 import { getPool } from './config'
+import { withTransaction } from './transaction'
 import type { Product } from '@/model/product'
 import type { StorageItem } from '@/model/storageItem'
 import { zodProductSchema } from '@/model/product'
@@ -36,73 +37,62 @@ export const getProduct = createServerOnlyFn(async (id: string) => {
 
 export const updateProductStocks = createServerOnlyFn(
   async (products: Array<Pick<Product, 'id' | 'stock'>>) => {
-    const client = await getPool().connect()
     try {
-      await client.query('BEGIN')
+      await withTransaction(getPool(), async (client) => {
+        const promises = products.map(({ id, stock }) => {
+          return client.query(updateProductStockQuery, [id, stock])
+        })
 
-      const promises = products.map(({ id, stock }) => {
-        return client.query(updateProductStockQuery, [id, stock])
+        await Promise.all(promises)
       })
-
-      await Promise.all(promises)
-
-      await client.query('COMMIT')
     } catch (error) {
-      await client.query('ROLLBACK')
       throw new Error('Failed to update product stocks: ' + error)
-    } finally {
-      client.release()
     }
   },
 )
 
 export const updateProduct = createServerOnlyFn(
-  async (product: Product, item?: StorageItem) => {
+  async (
+    id: string,
+    product: Pick<Product, 'name' | 'price' | 'stock' | 'picture'>,
+    item?: Pick<
+      StorageItem,
+      'path' | 'download_url' | 'uid' | 'name' | 'type' | 'size'
+    >,
+  ) => {
     const pool = getPool()
-    if (!item) {
-      try {
+
+    try {
+      if (!item) {
         await pool.query(updateProductQuery, [
-          product.id,
+          id,
           product.name,
           product.price,
           product.stock,
           product.picture,
         ])
-      } catch (error) {
-        throw new Error('Failed to update product: ' + error)
+      } else {
+        await withTransaction(pool, async (client) => {
+          await client.query(updateProductQuery, [
+            id,
+            product.name,
+            product.price,
+            product.stock,
+            item.download_url,
+          ])
+
+          await client.query(insertStorageItemQuery, [
+            item.path,
+            item.download_url,
+            item.uid,
+            item.name,
+            item.type,
+            item.size,
+          ])
+        })
       }
-
-      return
-    }
-
-    const client = await pool.connect()
-
-    try {
-      await client.query('BEGIN')
-
-      await client.query(updateProductQuery, [
-        product.id,
-        product.name,
-        product.price,
-        product.stock,
-        product.picture,
-      ])
-
-      await client.query(insertStorageItemQuery, [
-        item.path,
-        item.download_url,
-        item.uid,
-        item.name,
-        item.type,
-        item.size,
-      ])
-
-      await client.query('COMMIT')
     } catch (error) {
-      await client.query('ROLLBACK')
       throw new Error('Failed to update product: ' + error)
-    } finally {
-      client.release()
     }
   },
 )

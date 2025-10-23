@@ -13,7 +13,7 @@ import type { FormEvent } from 'react'
 import { getProduct } from '@/database/products'
 import { useAuthSession } from '@/session'
 import { m } from '@/paraglide/messages'
-import { zodProductSchema } from '@/model/product'
+import { zodUpdatableProductFieldsSchema } from '@/model/product'
 
 const loaderFn = createServerFn({ method: 'GET' })
   .inputValidator(z.string())
@@ -38,19 +38,32 @@ export const Route = createFileRoute('/_navbar/$productId')({
   },
 })
 
-const fieldsSchema = zodProductSchema.extend({
-  file: z.instanceof(File).nullish(),
-})
-
 function RouteComponent() {
   const { product } = Route.useLoaderData()
 
   const form = useForm({
-    defaultValues: fieldsSchema.parse({ ...product, file: null }),
+    defaultValues: zodUpdatableProductFieldsSchema.parse({
+      ...product,
+      file: null,
+    }),
     validators: {
-      onChange: fieldsSchema,
+      onChange: zodUpdatableProductFieldsSchema,
     },
-    onSubmit: async ({ value }) => {},
+    onSubmit: async ({ value }) => {
+      const entries = Object.entries(value)
+      const formData = entries.reduce((data, [key, val]) => {
+        if (!val) return data
+        data.append(key, typeof val === 'number' ? val.toString() : val)
+        return data
+      }, new FormData())
+      const response = await fetch(`/api/products/${product.id}`, {
+        method: 'PATCH',
+        body: formData,
+      })
+      if (!response.ok) {
+        throw new Error(await response.text())
+      }
+    },
   })
 
   const handleSubmit = useCallback(

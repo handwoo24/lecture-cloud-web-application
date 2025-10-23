@@ -11,10 +11,14 @@ export const zodProductSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1),
   category: zodCategorySchema,
-  price: z.string().min(0),
+  price: z.coerce.string().min(0),
   picture: z.string().url(),
-  stock: z.number().min(0),
+  stock: z.coerce.number().min(0),
   description: z.string(),
 })
 
 export type Product = z.infer<typeof zodProductSchema>
+
+export const zodUpdatableProductFieldsSchema = zodProductSchema.extend({
+  file: z.instanceof(File).nullish(),
+})

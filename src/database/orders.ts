@@ -4,6 +4,7 @@ import insertOrderQuery from './sql/insert_order.sql?raw'
 import insertOrderItemQuery from './sql/insert_order_item.sql?raw'
 import updateOrderQuery from './sql/update_order.sql?raw'
 import selectOrderItemsQuery from './sql/select_order_items.sql?raw'
+import { withTransaction } from './transaction'
 import type { Product } from '@/model/product'
 import { zodOrderItemSchema, zodOrderSchema } from '@/model/order'
 
@@ -13,33 +14,25 @@ export const createOrder = createServerOnlyFn(
     amount: string,
     items: Array<{ quantity: number; product: Product }>,
   ) => {
-    const client = await getPool().connect()
     try {
-      await client.query('BEGIN')
+      await withTransaction(getPool(), async (client) => {
+        const res = await client.query(insertOrderQuery, [uid, amount])
 
-      const res = await client.query(insertOrderQuery, [uid, amount])
+        const order = zodOrderSchema.parse(res.rows[0])
 
-      const order = zodOrderSchema.parse(res.rows[0])
+        const promises = items.map(({ product, quantity }) =>
+          client.query(insertOrderItemQuery, [
+            order.id,
+            product.id,
+            product.price,
+            quantity,
+          ]),
+        )
 
-      const promises = items.map(({ product, quantity }) =>
-        client.query(insertOrderItemQuery, [
-          order.id,
-          product.id,
-          product.price,
-          quantity,
-        ]),
-      )
-
-      await Promise.all(promises)
-
-      await client.query('COMMIT')
-
-      return order
+        await Promise.all(promises)
+      })
     } catch (error) {
-      await client.query('ROLLBACK')
       throw new Error('Failed to create order: ' + error)
-    } finally {
-      client.release()
     }
   },
 )
