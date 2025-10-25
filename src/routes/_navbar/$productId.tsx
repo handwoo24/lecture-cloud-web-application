@@ -63,6 +63,7 @@ function RouteComponent() {
       if (!response.ok) {
         throw new Error(await response.text())
       }
+      alert('상품 정보가 변경되었습니다.')
     },
   })
 
