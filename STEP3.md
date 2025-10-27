@@ -134,11 +134,7 @@ export const Route = createFileRoute('/api/auth/callback/google')({
         const session = await useAuthSession()
 
         // 세션에 인증정보를 저장합니다.
-        await session.update({
-          token: crypto.randomUUID(),
-          expires: new Date().getTime() + 60 * 60 * 1000,
-          uid: idToken.sub,
-        })
+        await session.update({ uid: idToken.sub })
 
         throw redirect({ to: '/' })
       },
@@ -169,21 +165,26 @@ export const verifyTokens = (client: OAuth2Client, tokens: Credentials) => {
 import { createServerOnlyFn } from '@tanstack/react-start'
 import { useSession } from '@tanstack/react-start/server'
 
-type Session = {
-  token?: string
-  expires?: number
-  uid?: string
-}
+type Session = { uid?: string }
 
 export const useAuthSession = createServerOnlyFn(() => {
   const AUTH_SECRET = process.env.AUTH_SECRET
+  const AUTH_NAME = process.env.AUTH_NAME
 
-  // .env 파일을 열고 AUTH_SECRET을 적절히 추가합니다. ex) AUTH_SECRET = doNotShareThisSecret
-  if (typeof AUTH_SECRET !== 'string') {
+  if (typeof AUTH_SECRET !== 'string' || typeof AUTH_NAME !== 'string') {
     throw new Error('Missing AUTH_SECRET')
   }
 
-  return useSession<Session>({ password: AUTH_SECRET })
+  return useSession<Session>({
+    name: AUTH_NAME,
+    password: AUTH_SECRET,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      httpOnly: true,
+      maxAge: 60 * 60 * 24 * 7,
+    },
+  })
 })
 ```
 이제 다시 구글 로그인을 시도해봅니다.   
@@ -429,11 +430,7 @@ export const Route = createFileRoute('/api/auth/callback/google')({
         const session = await useAuthSession()
         
         // 세션에 인증정보를 저장합니다.
-        await session.update({
-          token: crypto.randomUUID(),
-          expires: new Date().getTime() + 60 * 60 * 24 * 7 * 1000,
-          uid: user.id,
-        })
+        await session.update({ uid: user.id })
 
         throw redirect({ to: '/' })
       },

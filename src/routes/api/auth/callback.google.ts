@@ -35,11 +35,7 @@ export const Route = createFileRoute('/api/auth/callback/google')({
         const session = await useAuthSession()
 
         // 세션에 인증정보를 저장합니다.
-        await session.update({
-          token: crypto.randomUUID(),
-          expires: new Date().getTime() + 60 * 60 * 24 * 7 * 1000,
-          uid: user.id,
-        })
+        await session.update({ uid: user.id })
 
         throw redirect({ to: '/' })
       },
