@@ -351,11 +351,12 @@ function App() {
   const { name, category } = Route.useSearch()
   const navigate = Route.useNavigate()
 
-  const handleSubmitFilter = (e: FormEvent<HTMLFormElement>) => {
+  const handleChangeFilter = (e: FormEvent<HTMLFormElement>) => {
     // form의 값 변경을 감지하여 url 쿼리 파라미터를 변경합니다.
     const formData = new FormData(e.currentTarget)
-    const value = zodCategorySchema.parse(formData.get('category'))
-    navigate({ to: '/', search: { category: value, name } })
+    const result = zodCategorySchema.safeParse(formData.get('category'))
+    const category = result.success ? result.data : undefined
+    navigate({ to: '/', search: { category, name } })
   }
 
   const handleSubmitSearch = (e: FormEvent<HTMLFormElement>) => {
@@ -391,10 +392,14 @@ function App() {
         </form>
         <form
           className="filter"
-          onChange={handleSubmitFilter}
-          onReset={handleResetFilter}
+          onChange={handleChangeFilter}
         >
-          <input className="btn btn-square" type="reset" value="×" />
+          <input
+            className="btn btn-square filter-reset"
+            type="radio"
+            name="category"
+            value="x"
+          />
           <input
             className="btn"
             type="radio"
@@ -458,10 +463,11 @@ function App() {
     [navigate],
   )
 
-  const handleSubmitFilter = useCallback(
+  const handleChangeFilter = useCallback(
     (e: FormEvent<HTMLFormElement>) => {
       const formValue = parseFormValue(e.currentTarget, 'category')
-      const category = zodCategorySchema.parse(formValue)
+      const result = zodCategorySchema.safeParse(formValue)
+      const category = result.success ? result.data : undefined
       updateSearchParams({ ...search, category })
     },
     [navigate, search],

@@ -56,10 +56,11 @@ function App() {
     [navigate],
   )
 
-  const handleSubmitFilter = useCallback(
+  const handleChangeFilter = useCallback(
     (e: FormEvent<HTMLFormElement>) => {
       const formValue = parseFormValue(e.currentTarget, 'category')
-      const category = zodCategorySchema.parse(formValue)
+      const result = zodCategorySchema.safeParse(formValue)
+      const category = result.success ? result.data : undefined
       updateSearchParams({ ...search, category })
     },
     [navigate, search],
@@ -74,10 +75,6 @@ function App() {
     },
     [navigate, search],
   )
-
-  const handleResetFilter = useCallback(() => {
-    updateSearchParams({ ...search, category: undefined })
-  }, [navigate, search])
 
   return (
     <main>
@@ -95,12 +92,13 @@ function App() {
             </span>
           </label>
         </form>
-        <form
-          className="filter"
-          onChange={handleSubmitFilter}
-          onReset={handleResetFilter}
-        >
-          <input className="btn btn-square" type="reset" value="×" />
+        <form className="filter" onChange={handleChangeFilter}>
+          <input
+            className="btn btn-square filter-reset"
+            type="radio"
+            name="category"
+            value="x"
+          />
           <input
             className="btn"
             type="radio"
