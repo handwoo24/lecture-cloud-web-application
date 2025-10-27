@@ -148,7 +148,7 @@ function RouteComponent() {
                 children={(field) => (
                   <img
                     src={field.state.value}
-                    className="aspect-video object-cover rounded"
+                    className="aspect-video object-cover rounded w-full"
                   />
                 )}
               ></form.Field>

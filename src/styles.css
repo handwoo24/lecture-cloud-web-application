@@ -35,7 +35,7 @@ main {
 }
 
 .product-card > figure > img {
-  @apply object-cover aspect-video;
+  @apply object-cover aspect-video w-full;
 }
 
 .grid:has(> .product-card) {
